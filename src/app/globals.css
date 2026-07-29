@@ -1,0 +1,497 @@
+@import "../styles/tokens.css";
+@import "tailwindcss";
+@import "tw-animate-css";
+@config "../../tailwind.config.ts";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans-ui);
+  --font-mono: var(--font-mono-ui);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* Evergreen brand + semantic tokens as first-class Tailwind utilities
+     (bg-brand-muted, text-success, etc.) instead of --opslin-* arbitrary
+     values sprinkled through components (design-system.md §2/§5). */
+  --color-brand: var(--opslin-accent-default);
+  --color-brand-hover: var(--opslin-accent-hover);
+  --color-brand-active: var(--opslin-accent-active);
+  --color-brand-bright: var(--opslin-accent-bright);
+  --color-brand-muted: var(--opslin-accent-muted);
+  --color-success: var(--opslin-success-default);
+  --color-success-muted: var(--opslin-success-muted);
+  --color-success-foreground: var(--opslin-success-foreground);
+  --color-success-text: var(--opslin-success-text);
+  --color-warning: var(--opslin-warning-default);
+  --color-warning-muted: var(--opslin-warning-muted);
+  --color-warning-foreground: var(--opslin-warning-foreground);
+  --color-warning-text: var(--opslin-warning-text);
+  --color-danger: var(--opslin-danger-default);
+  --color-danger-muted: var(--opslin-danger-muted);
+  --color-danger-foreground: var(--opslin-danger-foreground);
+  --color-danger-text: var(--opslin-danger-text);
+  --color-info: var(--opslin-info-default);
+  --color-info-muted: var(--opslin-info-muted);
+  --color-info-foreground: var(--opslin-info-foreground);
+  --color-info-text: var(--opslin-info-text);
+  --color-chart-violet: var(--opslin-chart-violet);
+  --color-accent-2: var(--opslin-accent-2-default);
+  --color-accent-2-muted: var(--opslin-accent-2-muted);
+  --color-accent-2-border: var(--opslin-accent-2-border);
+  --color-inverse: var(--opslin-bg-inverse);
+  --color-inverse-2: var(--opslin-bg-inverse-2);
+  --color-text-inverse: var(--opslin-text-inverse);
+  --color-text-on-inverse-muted: var(--opslin-text-on-inverse-muted);
+  --color-border-inverse: var(--opslin-border-inverse);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+}
+
+@layer base {
+  html {
+    color-scheme: light dark;
+  }
+  * {
+    @apply border-border outline-ring/50;
+  }
+  *:focus-visible {
+    @apply ring-ring/50 ring-2 ring-offset-2 ring-offset-background;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans-ui);
+    text-rendering: optimizeLegibility;
+  }
+
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: var(--font-mono-ui);
+    font-feature-settings: "tnum" 1;
+  }
+}
+
+@layer components {
+  .dashboard-shell {
+    @apply min-h-screen bg-background text-foreground;
+  }
+
+  .dashboard-surface {
+    @apply border-border/80 bg-card text-card-foreground rounded-xl border;
+    box-shadow: var(--opslin-elevation-2);
+  }
+
+  .dashboard-grid {
+    @apply grid gap-4 md:gap-6;
+  }
+
+  .dashboard-page {
+    @apply mx-auto flex w-full max-w-[96rem] flex-col gap-6 px-4 py-4 sm:px-6 lg:px-8;
+  }
+
+  .dashboard-section-label {
+    @apply text-muted-foreground text-[11px] font-medium uppercase tracking-[0.18em];
+  }
+
+  .dashboard-stat-value {
+    @apply text-foreground font-mono text-3xl font-medium tracking-tight;
+    font-feature-settings: "tnum" 1;
+  }
+
+  .dashboard-kbd {
+    @apply border-border/80 bg-secondary text-muted-foreground inline-flex min-w-5 items-center justify-center rounded-md border px-1.5 py-0.5 text-[11px] font-medium;
+  }
+
+  .upgrade-prompt {
+    @apply border-border/80 bg-card text-card-foreground flex items-start gap-4 rounded-xl border p-5;
+    box-shadow: var(--opslin-elevation-2);
+  }
+
+  .upgrade-prompt-icon {
+    @apply bg-primary/10 text-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-lg;
+  }
+
+  .upgrade-prompt-content {
+    @apply min-w-0 space-y-2;
+  }
+
+  .upgrade-prompt-content h4 {
+    @apply text-base font-semibold text-foreground;
+  }
+
+  .upgrade-prompt-content p {
+    @apply text-sm text-muted-foreground;
+  }
+
+  .upgrade-prompt-btn {
+    @apply bg-primary text-primary-foreground inline-flex h-9 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition-colors hover:bg-primary/90;
+  }
+
+  .upgrade-badge {
+    @apply border-border bg-secondary text-muted-foreground inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors hover:border-primary/40 hover:text-foreground;
+  }
+
+  .usage-bar-container {
+    @apply border-border/70 bg-card rounded-xl border p-4;
+    box-shadow: var(--opslin-elevation-1);
+  }
+
+  .usage-bar-header {
+    @apply flex items-center justify-between gap-3 text-sm;
+  }
+
+  .usage-bar-header span:first-child {
+    @apply font-medium text-foreground;
+  }
+
+  .usage-bar-header span:last-child {
+    @apply font-mono text-muted-foreground;
+  }
+
+  .usage-bar-track {
+    @apply bg-secondary mt-3 h-2 overflow-hidden rounded-full;
+  }
+
+  .usage-bar-fill {
+    @apply bg-primary h-full rounded-full transition-all duration-300;
+  }
+
+  .usage-bar-fill.warning {
+    background-color: var(--opslin-warning-default);
+  }
+
+  .usage-bar-fill.critical {
+    background-color: var(--opslin-danger-default);
+  }
+
+  .usage-bar-upgrade {
+    @apply mt-2 text-xs font-medium;
+    color: var(--opslin-danger-default);
+  }
+
+  /* Single-source glass recipe (doc 02 §3.3) — bg + border + inset top
+     highlight + shadow, one place, applied only to the whitelisted
+     floating-chrome surfaces (command palette, dialog/drawer panels,
+     detail-drawer, floating topbars, deploy overlay backdrop, toasts, and
+     at most one hero/summary card per page). Never on tables/lists/forms/
+     log or terminal panes. Budget: <=2 simultaneously-blurred layers/viewport.
+     Blur itself is NOT set here — pair this class with Tailwind's own
+     `backdrop-blur-md` (12px, topbars/drawers/dialogs — the default doc 02
+     names) or `backdrop-blur-xl` (24px, command palette) utility on the
+     element. A hand-written `backdrop-filter: blur(var(--x, 16px))` property
+     here was tried first but Lightning CSS silently drops the unprefixed
+     `backdrop-filter` declaration for that pattern (keeps only
+     `-webkit-backdrop-filter`, verified against the compiled CSS output),
+     so `getComputedStyle().backdropFilter` came back "none" and the panel
+     rendered as a flat tint with no blur at all — Tailwind's own utility
+     compiles correctly (confirmed against the same compiled output) since it
+     builds the declaration through its `--tw-backdrop-blur` composition
+     chain rather than a bare `var()`, so utilities are the reliable path here. */
+  .glass-panel {
+    background-color: var(--opslin-glass-bg);
+    border: 1px solid var(--opslin-glass-border);
+    box-shadow:
+      inset 0 1px 0 var(--opslin-glass-highlight),
+      var(--opslin-glass-shadow);
+  }
+
+  @supports not (backdrop-filter: blur(1px)) {
+    .glass-panel {
+      background-color: color-mix(in srgb, var(--opslin-glass-bg) 96%, var(--card));
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .glass-panel {
+      background-color: color-mix(in srgb, var(--opslin-glass-bg) 96%, var(--card));
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+  }
+
+  /* Same glass language as .glass-panel (border/shadow/blur unchanged), but
+     less translucent — R6 a11y fix: axe measured StatusBadge/sha text
+     inside the deploy overlay failing AA (4.06:1, 3.96:1), because
+     --opslin-glass-bg's 66-72% opacity lets whatever's behind the overlay
+     bleed through and shift the effective backdrop unpredictably. Content
+     that must stay legible regardless of what's behind it (a full-screen
+     modal over arbitrary page content, not a small chrome surface like the
+     command palette) needs a backdrop solid enough to not depend on it. */
+  .deploy-overlay-solid-bg {
+    background-color: rgba(255, 255, 255, 0.94);
+    border: 1px solid var(--opslin-glass-border);
+    box-shadow:
+      inset 0 1px 0 var(--opslin-glass-highlight),
+      var(--opslin-glass-shadow);
+  }
+
+  .dark .deploy-overlay-solid-bg {
+    background-color: rgba(16, 26, 21, 0.94);
+  }
+
+  /* Static, pre-composited ambient glow (doc 02 §3.5) — dark mode only
+     (--opslin-glow-ambient is `none` in :root), no animation/blur cost.
+     Whitelist: Overview hero, servers/[id] status row (R4), auth split-shell
+     right panel (R5, replacing an ad-hoc bg-inverse-2 radial gradient at the
+     same 20%/0% origin — default --glow-x/--glow-y already match), deployment
+     live view, landing dark sections; at most one per page; never behind
+     tables/logs. Set --glow-x/--glow-y inline per-surface to reposition the
+     radial origin if needed. */
+  .glow-ambient {
+    position: relative;
+  }
+
+  .glow-ambient::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image: var(--opslin-glow-ambient);
+    pointer-events: none;
+  }
+
+  /* Shared hover-lift for interactive cards (doc 02 §5 "Elevation" motion
+     tier — 200ms ease-out, translate-y(-2px) + shadow step). The shadow step
+     always transitions (a shadow change isn't vestibular motion); the actual
+     translateY only applies under prefers-reduced-motion: no-preference,
+     matching Tailwind's motion-safe: convention for a plain CSS class. */
+  .hover-lift {
+    transition: box-shadow 200ms ease-out;
+  }
+
+  .hover-lift:hover {
+    box-shadow: var(--opslin-elevation-3);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .hover-lift {
+      transition:
+        box-shadow 200ms ease-out,
+        transform 200ms ease-out;
+    }
+
+    .hover-lift:hover {
+      transform: translateY(-2px);
+    }
+  }
+
+  /* Sonner toasts are glass (doc 02 §3.3 allowlist) — bg/text/border colors
+     are set via the --normal-* vars in components/ui/sonner.tsx; blur is
+     applied there too via toastOptions.className="backdrop-blur-md" (a real
+     Tailwind utility, not a hand-written rule here — see the comment on
+     .glass-panel above for why). No @supports/reduced-transparency fallback
+     for toasts specifically: they're small and transient (auto-dismiss),
+     unlike the longer-lived dialog/palette surfaces that do get the fallback. */
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.45);
+    transform: scale(0.96);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);
+    transform: scale(1);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+    transform: scale(0.96);
+  }
+}
+
+.deployment-timeline-pulse {
+  animation: pulse 1.4s ease-out infinite;
+}
+
+/* === LANDING PAGE DESIGN SYSTEM === */
+/* ReadyLaunch-inspired light/dark SaaS system + transparent beta positioning */
+
+@layer base {
+  .landing-theme {
+    --landing-bg: #F7F4EE;
+    --landing-bg-alt: #EFE9DE;
+    --landing-card: rgba(255, 255, 255, 0.74);
+    --landing-card-hover: rgba(255, 255, 255, 0.92);
+    --landing-border: rgba(24, 24, 27, 0.1);
+    --landing-border-hover: rgba(24, 24, 27, 0.18);
+    --landing-text: #18181B;
+    --landing-text-secondary: #52525B;
+    --landing-text-muted: #71717A;
+    --landing-dark: #0A0A0A;
+    --landing-accent: #22C55E;
+    --landing-accent-hover: #3ED070;
+    --landing-accent-soft: rgba(34, 197, 94, 0.1);
+    --landing-success: #22C55E;
+  }
+}
+
+@layer components {
+  .landing-section {
+    @apply py-16 sm:py-24 lg:py-28;
+  }
+
+  .landing-container {
+    @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .landing-label {
+    @apply mb-4 text-xs font-semibold uppercase tracking-[0.22em] text-green-600;
+  }
+
+  .landing-heading {
+    @apply max-w-3xl text-3xl font-semibold leading-[1.08] tracking-normal text-zinc-950 sm:text-5xl;
+  }
+
+  .landing-description {
+    @apply max-w-2xl text-base leading-7 text-zinc-600 sm:text-lg;
+  }
+
+  .landing-card {
+    @apply rounded-3xl border border-black/10 bg-white/75 p-5 shadow-[0_18px_60px_rgba(24,24,27,0.08)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-black/15 hover:bg-white/95 sm:p-8;
+  }
+
+  .landing-btn-primary {
+    @apply inline-flex min-h-11 items-center justify-center rounded-full bg-zinc-950 px-6 py-3 text-sm font-semibold text-white shadow-[0_14px_35px_rgba(24,24,27,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-green-600 hover:shadow-[0_20px_48px_rgba(34,197,94,0.24)] active:translate-y-0 max-sm:w-full;
+  }
+
+  .landing-btn-secondary {
+    @apply inline-flex min-h-11 items-center justify-center rounded-full border border-black/10 bg-white/70 px-6 py-3 text-sm font-semibold text-zinc-800 shadow-[0_12px_30px_rgba(24,24,27,0.08)] backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:border-black/20 hover:bg-white active:translate-y-0 max-sm:w-full;
+  }
+
+  .landing-btn-primary:focus-visible {
+    @apply outline-none ring-2 ring-green-500 ring-offset-2 ring-offset-[#F7F4EE];
+  }
+
+  .landing-btn-secondary:focus-visible {
+    @apply outline-none ring-2 ring-green-500 ring-offset-2 ring-offset-[#F7F4EE];
+  }
+
+  .landing-link {
+    @apply inline-flex items-center gap-1 text-sm font-semibold text-zinc-700 transition-colors duration-200 hover:text-green-600;
+  }
+
+  .landing-theme a:focus-visible,
+  .landing-theme button:focus-visible,
+  .landing-link:focus-visible {
+    @apply outline-none ring-2 ring-green-500 ring-offset-2 ring-offset-[#F7F4EE];
+  }
+
+  .landing-badge {
+    @apply rounded-full border border-green-500/15 bg-green-500/10 px-3 py-1 text-xs font-semibold text-green-700;
+  }
+
+  .landing-dark {
+    @apply bg-[#0A0A0A] text-white;
+  }
+
+  .landing-dark .landing-label {
+    @apply text-green-300;
+  }
+
+  .landing-dark .landing-heading {
+    @apply text-white;
+  }
+
+  .landing-dark .landing-description {
+    @apply text-zinc-400;
+  }
+
+  .landing-dark .landing-card {
+    @apply border-white/10 bg-white/[0.055] shadow-[0_18px_70px_rgba(0,0,0,0.35)] hover:border-white/15 hover:bg-white/[0.075];
+  }
+
+  .landing-dark .landing-btn-secondary {
+    @apply border-white/10 bg-white/5 text-white hover:border-white/20 hover:bg-white/10;
+  }
+
+  .landing-reveal {
+    @apply opacity-0 translate-y-8 transition-all duration-700 ease-out;
+  }
+
+  .landing-reveal.visible {
+    @apply opacity-100 translate-y-0 transition-all duration-700 ease-out;
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+
+  @media (max-width: 767px) {
+    .landing-reveal {
+      @apply opacity-100 translate-y-0 transition-none;
+    }
+  }
+
+  .landing-grid-bg {
+    background-image:
+      linear-gradient(rgba(24, 24, 27, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(24, 24, 27, 0.055) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .landing-shine {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .landing-shine::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-120%) skewX(-18deg);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+    animation: landing-shine 4.5s ease-in-out infinite;
+  }
+
+  @keyframes landing-shine {
+    0%,
+    55% {
+      transform: translateX(-120%) skewX(-18deg);
+    }
+    100% {
+      transform: translateX(120%) skewX(-18deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .landing-reveal,
+    .landing-reveal.visible {
+      @apply opacity-100 translate-y-0 transition-none;
+    }
+  }
+}

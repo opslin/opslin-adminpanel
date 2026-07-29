@@ -1,0 +1,299 @@
+:root {
+  color-scheme: light;
+
+  --font-sans-ui: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono-ui: var(--font-geist-mono), "SF Mono", Menlo, Consolas, monospace;
+
+  --opslin-bg-canvas: #f3f6f2;
+  --opslin-bg-primary: #ffffff;
+  --opslin-bg-secondary: #edf1ec;
+  --opslin-bg-tertiary: #e2e8e1;
+  --opslin-bg-accent: #d4dcd2;
+  --opslin-bg-inverse: #0d1712;
+  --opslin-bg-inverse-2: #16241c;
+
+  --opslin-border-subtle: rgba(13, 23, 18, 0.06);
+  --opslin-border-default: rgba(13, 23, 18, 0.1);
+  --opslin-border-strong: rgba(13, 23, 18, 0.14);
+  --opslin-border-focus: rgba(34, 197, 94, 0.45);
+
+  --opslin-text-primary: #101613;
+  --opslin-text-secondary: #4b5550;
+  /* Darkened from #6b756f (2026-07-15, R1): the original value failed AA
+     4.5:1 as muted-foreground text on bg-muted (4.18:1) and bg-accent
+     (3.83:1) — see docs/ui-refinement/02_OPSLIN_DESIGN_SYSTEM_PLAN.md §9.
+     This clears both (4.97:1 / 4.56:1) while only strengthening the
+     already-passing bg-canvas/bg-card pairs. */
+  --opslin-text-tertiary: #606964;
+  --opslin-text-quaternary: #9aa39d;
+  --opslin-text-inverse: #f4f7f4;
+  --opslin-text-on-inverse-muted: rgba(244, 247, 244, 0.62);
+
+  --opslin-accent-default: #15803d;
+  --opslin-accent-hover: #136b34;
+  --opslin-accent-active: #0f5a2b;
+  --opslin-accent-bright: #22c55e;
+  --opslin-accent-muted: rgba(34, 197, 94, 0.12);
+
+  --opslin-success-default: #15803d;
+  --opslin-success-muted: rgba(34, 197, 94, 0.12);
+  --opslin-warning-default: #d97706;
+  --opslin-warning-muted: rgba(217, 119, 6, 0.12);
+  --opslin-danger-default: #dc2626;
+  --opslin-danger-muted: rgba(220, 38, 38, 0.12);
+  --opslin-info-default: #2563eb;
+  --opslin-info-muted: rgba(37, 99, 235, 0.12);
+
+  /* Text/icon color for a status hue drawn on a SOLID fill of that same
+     status color (buttons, solid badges) — e.g. white-ish text on a solid
+     green button. Distinct from -default (also used for accents/icons on
+     neutral backgrounds) and from -text below (status color drawn AS text
+     on that status's own -muted background or on card/canvas). */
+  --opslin-success-foreground: #f4f7f4;
+  --opslin-warning-foreground: #231a02;
+  --opslin-danger-foreground: #ffffff;
+  --opslin-info-foreground: #eff6ff;
+
+  /* AA-safe variant of each status hue for rendering as TEXT against that
+     status's own -muted background (badges/alerts/pills) or against
+     card/canvas — -default is tuned for accents/icons/solid fills and does
+     not reliably clear 4.5:1 as small text on -muted in every theme (see
+     docs/ui-refinement/02_OPSLIN_DESIGN_SYSTEM_PLAN.md §9 for the AA table
+     that drove these values). success already cleared AA as -default, kept
+     equal here for a uniform 4-status API. */
+  --opslin-success-text: #15803d;
+  --opslin-warning-text: #92400e;
+  --opslin-danger-text: #b91c1c;
+  --opslin-info-text: #1d4ed8;
+
+  /* 6th distinguishable data-series hue for multi-metric charts (e.g.
+     monitoring's CPU vs memory) — not a semantic status color like the
+     others above, purely a chart accent. Aliases accent-2 below (the
+     controlled violet secondary-accent family) — same color, two names for
+     two roles: chart series vs. general insight/data-highlight accent. */
+  --opslin-chart-violet: #7c3aed;
+  --opslin-accent-2-default: #7c3aed;
+  --opslin-accent-2-muted: rgba(124, 58, 237, 0.1);
+  --opslin-accent-2-border: rgba(124, 58, 237, 0.25);
+
+  --opslin-glass-bg: rgba(255, 255, 255, 0.72);
+  --opslin-glass-border: rgba(13, 23, 18, 0.08);
+  --opslin-glass-highlight: rgba(255, 255, 255, 0.55);
+  --opslin-glass-shadow: 0 8px 32px rgba(13, 23, 18, 0.1);
+
+  /* Dark-mode-only: a single static, pre-composited radial glow (no
+     animation/blur cost) for the whitelisted hero surfaces in doc 02 §3.5.
+     none in light mode — light has no ambient-glow treatment. */
+  --opslin-glow-ambient: none;
+
+  --opslin-density-row-compact: 2.5rem;
+  --opslin-text-dense: 13px;
+
+  --opslin-radius-sm: 0.375rem;
+  --opslin-radius-md: 0.5rem;
+  --opslin-radius-lg: 0.625rem;
+  --opslin-radius-xl: 1rem;
+  --opslin-radius-2xl: 1.25rem;
+  --opslin-radius-3xl: 1.5rem;
+  --opslin-radius-full: 9999px;
+
+  --opslin-space-1: 0.25rem;
+  --opslin-space-2: 0.5rem;
+  --opslin-space-3: 0.75rem;
+  --opslin-space-4: 1rem;
+  --opslin-space-5: 1.25rem;
+  --opslin-space-6: 1.5rem;
+  --opslin-space-7: 2rem;
+  --opslin-space-8: 2.5rem;
+  --opslin-space-9: 3rem;
+  --opslin-space-10: 4rem;
+
+  --opslin-elevation-1: 0 0 0 1px var(--opslin-border-subtle);
+  --opslin-elevation-2: 0 0 0 1px var(--opslin-border-default);
+  --opslin-elevation-3: 0 0 0 1px var(--opslin-border-default), 0 10px 40px rgba(9, 9, 11, 0.12);
+  --opslin-elevation-4: 0 0 0 1px var(--opslin-border-strong), 0 4px 16px rgba(9, 9, 11, 0.12);
+
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+
+  --opslin-border-inverse: rgba(244, 247, 244, 0.08);
+
+  /* ANSI accent palette for the terminal panel, which stays dark in both
+     themes (bg-inverse). Unlike --success/--warning/--danger/--info/--primary
+     above, these must NOT flip with the theme toggle — they're tuned once
+     for legibility against the permanently-dark inverse background, using
+     the same hues dark mode already uses for those semantic colors. */
+  --opslin-terminal-red: #ef4444;
+  --opslin-terminal-green: #22c55e;
+  --opslin-terminal-yellow: #f59e0b;
+  --opslin-terminal-blue: #3b82f6;
+  --opslin-terminal-magenta: #22c55e;
+  --opslin-terminal-cyan: rgba(74, 222, 128, 0.45);
+
+  --radius: var(--opslin-radius-xl);
+  --background: var(--opslin-bg-canvas);
+  --foreground: var(--opslin-text-primary);
+  --card: var(--opslin-bg-primary);
+  --card-foreground: var(--opslin-text-primary);
+  --popover: var(--opslin-bg-primary);
+  --popover-foreground: var(--opslin-text-primary);
+  --primary: var(--opslin-accent-default);
+  --primary-foreground: var(--opslin-text-inverse);
+  --secondary: var(--opslin-bg-secondary);
+  --secondary-foreground: var(--opslin-text-primary);
+  --muted: var(--opslin-bg-secondary);
+  --muted-foreground: var(--opslin-text-tertiary);
+  --accent: var(--opslin-bg-tertiary);
+  --accent-foreground: var(--opslin-text-primary);
+  --destructive: var(--opslin-danger-default);
+  --border: var(--opslin-border-default);
+  --input: var(--opslin-border-strong);
+  --ring: var(--opslin-border-focus);
+  --chart-1: var(--opslin-accent-bright);
+  --chart-2: var(--opslin-info-default);
+  --chart-3: var(--opslin-danger-default);
+  --chart-4: var(--opslin-warning-default);
+  --chart-5: var(--opslin-success-default);
+  --sidebar: var(--opslin-bg-inverse);
+  --sidebar-foreground: var(--opslin-text-on-inverse-muted);
+  --sidebar-primary: var(--opslin-accent-bright);
+  --sidebar-primary-foreground: var(--opslin-bg-inverse);
+  --sidebar-accent: var(--opslin-accent-muted);
+  --sidebar-accent-foreground: var(--opslin-text-inverse);
+  --sidebar-border: var(--opslin-border-inverse);
+  --sidebar-ring: var(--opslin-border-focus);
+}
+
+.dark {
+  color-scheme: dark;
+
+  /* Evergreen dark mode: same forest-green brand DNA as light, luminance
+     mirrored. The sidebar/hero "inverse" surface stays the same near-black
+     forest tone as light mode (it's already dark) — canvas/cards sit one
+     step lighter so page vs. sidebar hierarchy is still legible. */
+  --opslin-bg-canvas: #0b1310;
+  --opslin-bg-primary: #101a15;
+  --opslin-bg-secondary: #16221b;
+  --opslin-bg-tertiary: #1e2c23;
+  --opslin-bg-accent: #263528;
+  --opslin-bg-inverse: #0d1712;
+  --opslin-bg-inverse-2: #16241c;
+
+  --opslin-border-subtle: rgba(244, 247, 244, 0.06);
+  --opslin-border-default: rgba(244, 247, 244, 0.1);
+  --opslin-border-strong: rgba(244, 247, 244, 0.16);
+  --opslin-border-focus: rgba(74, 222, 128, 0.45);
+  --opslin-border-inverse: rgba(244, 247, 244, 0.08);
+
+  /* Same invariant terminal ANSI palette as :root — intentionally identical
+     in both blocks, see the comment on this token group in :root above. */
+  --opslin-terminal-red: #ef4444;
+  --opslin-terminal-green: #22c55e;
+  --opslin-terminal-yellow: #f59e0b;
+  --opslin-terminal-blue: #3b82f6;
+  --opslin-terminal-magenta: #22c55e;
+  --opslin-terminal-cyan: rgba(74, 222, 128, 0.45);
+
+  --opslin-text-primary: #f4f7f4;
+  --opslin-text-secondary: #a9b3ac;
+  --opslin-text-tertiary: #78837c;
+  --opslin-text-quaternary: #56605a;
+  /* Stays light in both themes — this is "text for the always-dark
+     inverse/sidebar surface," not "text that contrasts with the current
+     theme's primary button." See --primary-foreground below for that. */
+  --opslin-text-inverse: #f4f7f4;
+  --opslin-text-on-inverse-muted: rgba(244, 247, 244, 0.62);
+
+  --opslin-accent-default: #22c55e;
+  --opslin-accent-hover: #3ed070;
+  --opslin-accent-active: #16a34a;
+  --opslin-accent-bright: #4ade80;
+  --opslin-accent-muted: rgba(74, 222, 128, 0.14);
+
+  --opslin-success-default: #22c55e;
+  --opslin-success-muted: rgba(74, 222, 128, 0.14);
+  --opslin-warning-default: #f59e0b;
+  --opslin-warning-muted: rgba(245, 158, 11, 0.14);
+  --opslin-danger-default: #ef4444;
+  --opslin-danger-muted: rgba(239, 68, 68, 0.14);
+  --opslin-info-default: #3b82f6;
+  --opslin-info-muted: rgba(59, 130, 246, 0.14);
+
+  --opslin-success-foreground: #052e16;
+  --opslin-warning-foreground: #231a02;
+  /* Dark mode's danger/info -default fills are brighter than light mode's
+     (matches the same reasoning as --primary-foreground above: a bright
+     fill needs dark text, not light) — near-white fails AA here. */
+  --opslin-danger-foreground: #1a0505;
+  --opslin-info-foreground: #0c1a3a;
+
+  /* danger/info -default fail AA 4.5:1 as text on their own -muted in dark
+     (4.15:1 / 4.09:1) — lighter variants clear it; success/warning already
+     pass as -default and are kept equal here (see tokens.css :root comment
+     + doc 02 §9 for the source AA table). */
+  --opslin-success-text: #22c55e;
+  --opslin-warning-text: #f59e0b;
+  --opslin-danger-text: #f87171;
+  --opslin-info-text: #60a5fa;
+
+  --opslin-chart-violet: #a78bfa;
+  --opslin-accent-2-default: #a78bfa;
+  --opslin-accent-2-muted: rgba(167, 139, 250, 0.14);
+  --opslin-accent-2-border: rgba(167, 139, 250, 0.28);
+
+  --opslin-glass-bg: rgba(16, 26, 21, 0.66);
+  --opslin-glass-border: rgba(244, 247, 244, 0.1);
+  --opslin-glass-highlight: rgba(244, 247, 244, 0.06);
+  --opslin-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+
+  /* Static pre-composited radial (no animation, no blur cost) — doc 02 §3.5.
+     --glow-x/--glow-y let a whitelisted surface reposition the glow's
+     origin; default is top-left-ish per the doc's radial spec. */
+  --opslin-glow-ambient: radial-gradient(
+    600px circle at var(--glow-x, 20%) var(--glow-y, 0%),
+    rgba(34, 197, 94, 0.07),
+    transparent 60%
+  );
+
+  --opslin-elevation-1: 0 0 0 1px var(--opslin-border-subtle);
+  --opslin-elevation-2: 0 0 0 1px var(--opslin-border-default), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --opslin-elevation-3: 0 0 0 1px var(--opslin-border-default), 0 12px 44px rgba(0, 0, 0, 0.55);
+  --opslin-elevation-4: 0 0 0 1px var(--opslin-border-strong), 0 6px 20px rgba(0, 0, 0, 0.5);
+
+  --background: var(--opslin-bg-canvas);
+  --foreground: var(--opslin-text-primary);
+  --card: var(--opslin-bg-primary);
+  --card-foreground: var(--opslin-text-primary);
+  --popover: var(--opslin-bg-primary);
+  --popover-foreground: var(--opslin-text-primary);
+  --primary: var(--opslin-accent-default);
+  /* Dark mode's --primary is a bright green fill (#22c55e) — needs dark
+     text for contrast, the opposite of light mode's dark-ish green fill
+     which needs light text. Not routed through --opslin-text-inverse
+     (that token means "text for the always-dark sidebar," not this). */
+  --primary-foreground: var(--opslin-bg-inverse);
+  --secondary: var(--opslin-bg-secondary);
+  --secondary-foreground: var(--opslin-text-primary);
+  --muted: var(--opslin-bg-secondary);
+  --muted-foreground: var(--opslin-text-secondary);
+  --accent: var(--opslin-bg-tertiary);
+  --accent-foreground: var(--opslin-text-primary);
+  --destructive: var(--opslin-danger-default);
+  --border: var(--opslin-border-default);
+  --input: var(--opslin-border-strong);
+  --ring: var(--opslin-border-focus);
+  --chart-1: var(--opslin-accent-bright);
+  --chart-2: var(--opslin-info-default);
+  --chart-3: var(--opslin-danger-default);
+  --chart-4: var(--opslin-warning-default);
+  --chart-5: var(--opslin-success-default);
+  --sidebar: var(--opslin-bg-inverse);
+  --sidebar-foreground: var(--opslin-text-on-inverse-muted);
+  --sidebar-primary: var(--opslin-accent-bright);
+  --sidebar-primary-foreground: var(--opslin-bg-inverse);
+  --sidebar-accent: var(--opslin-accent-muted);
+  --sidebar-accent-foreground: var(--opslin-text-inverse);
+  --sidebar-border: var(--opslin-border-inverse);
+  --sidebar-ring: var(--opslin-border-focus);
+}
