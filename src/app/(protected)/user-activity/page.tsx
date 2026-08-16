@@ -14,18 +14,28 @@ import { ApiRequestError, api, type AdminUserActivityEventItem } from "@/lib/api
 import { formatRelativeTime } from "@/lib/utils";
 
 function targetLabel(event: AdminUserActivityEventItem) {
-  if (!event.targetType && !event.targetId) {
-    return "None";
+  if (!event.targetId) {
+    return event.targetType ?? "—";
   }
-  return `${event.targetType ?? "target"}:${event.targetId?.slice(0, 8) ?? "unknown"}`;
+  return `${event.targetType ?? "target"}:${event.targetId.slice(0, 8)}`;
+}
+
+function formatDetailValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+  return String(value);
 }
 
 function detailSummary(detail: Record<string, unknown> | null) {
   if (!detail) {
     return "—";
   }
-  const keys = Object.keys(detail);
-  if (keys.length === 0) {
+  const entries = Object.entries(detail);
+  if (entries.length === 0) {
     return "—";
   }
   // Surface the error category inline when present — the whole point of
@@ -34,7 +44,12 @@ function detailSummary(detail: Record<string, unknown> | null) {
   if (typeof detail.errorCategory === "string") {
     return `errorCategory: ${detail.errorCategory}`;
   }
-  return keys.slice(0, 3).join(", ");
+  // key: value, not just the key name — the key alone ("path") told the
+  // admin nothing; the value ("/servers") is the actual signal.
+  return entries
+    .slice(0, 3)
+    .map(([key, value]) => `${key}: ${formatDetailValue(value)}`)
+    .join(", ");
 }
 
 export default function AdminUserActivityPage() {
