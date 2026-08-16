@@ -22,6 +22,7 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   TrendingUp,
+  UserSearch,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -77,6 +78,7 @@ const adminNavGroups: AdminNavGroup[] = [
     label: "Governance",
     items: [
       { label: "Audit Logs", href: "/audit", icon: ScrollText },
+      { label: "User Activity", href: "/user-activity", icon: UserSearch },
       { label: "Settings", href: "/settings", icon: SettingsIcon },
     ],
   },

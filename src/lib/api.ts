@@ -276,6 +276,11 @@ class ApiClient {
     }
 
 
+    async getAdminUserActivity(query: AdminUserActivityQuery) {
+        return this.get<AdminUserActivityResponse>(`/admin/user-activity${toQueryString(query)}`);
+    }
+
+
     async getAdminInvestorMetrics(query: AdminInvestorMetricsQuery = {}) {
         return this.get<AdminInvestorMetricsResponse>(`/admin/investor-metrics${toQueryString(query)}`);
     }
@@ -839,6 +844,39 @@ export interface AdminAuditLogsResponse {
     total: number;
     page: number;
     pageSize: number;
+    pagination: AdminPagination;
+}
+
+// Named user-activity, not "activity" — the API's own /activity route is an
+// unrelated, already-shipped customer-facing feed; this is the founder-only
+// per-user behavior timeline backed by ClickHouse (opslin-api/src/lib/user-activity.ts).
+export interface AdminUserActivityQuery {
+    email: string;
+    page?: number;
+    pageSize?: number;
+    event?: string;
+    from?: string;
+    to?: string;
+}
+
+export interface AdminUserActivityEventItem {
+    event: string;
+    orgId: string | null;
+    targetType: string | null;
+    targetId: string | null;
+    detail: Record<string, unknown> | null;
+    ip: string;
+    time: string;
+}
+
+export interface AdminUserActivityResponse {
+    user: {
+        id: string;
+        email: string;
+        name: string;
+        createdAt: string;
+    };
+    events: AdminUserActivityEventItem[];
     pagination: AdminPagination;
 }
 
