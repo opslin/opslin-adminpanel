@@ -866,6 +866,13 @@ export interface AdminUserActivityEventItem {
     targetId: string | null;
     detail: Record<string, unknown> | null;
     ip: string;
+    device: string;
+    // Free-tier GeoLite2 lookup — country is a real ISO code, but
+    // likelyDatacenter is a heuristic (ASN-name pattern match against known
+    // hosting/cloud/VPN providers), not a definitive VPN/proxy detection.
+    // MaxMind's real Anonymous-IP signal is a separate paid product.
+    country: string | null;
+    likelyDatacenter: boolean;
     time: string;
 }
 

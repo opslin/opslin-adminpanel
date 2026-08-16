@@ -7,11 +7,48 @@ import { Mail, Search, UserSearch } from "lucide-react";
 
 import { DataTable } from "@/components/admin/data-table";
 import { EmptyState } from "@/components/admin/empty-state";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ApiRequestError, api, type AdminUserActivityEventItem } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/utils";
+
+// ClickHouse's stored `time` comes back as a naive "YYYY-MM-DD HH:MM:SS.mmm"
+// string with no timezone marker (opslin-api/src/lib/user-activity.ts's
+// toClickHouseDateTime strips the "T"/"Z" ClickHouse's insert parser
+// rejects) — the value itself is UTC, but re-parsing that naive string with
+// `new Date(...)` lets the browser guess, and it guesses local time, not
+// UTC. Re-attach "T"/"Z" first so it's unambiguous before doing anything
+// with it (relative time, IST display, or otherwise).
+function parseActivityTime(value: string): Date {
+  return new Date(`${value.replace(" ", "T")}Z`);
+}
+
+function formatIST(value: string): string {
+  return `${parseActivityTime(value).toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true,
+  })} IST`;
+}
+
+// ISO 3166-1 alpha-2 code -> flag emoji via Unicode regional indicator
+// symbols (each letter A-Z maps to U+1F1E6..U+1F1FF; 127397 = 0x1F1E6 - 65).
+// No image/API needed for the flag itself — only the country code (which
+// comes from a real GeoLite2 lookup) needs resolving server-side.
+function countryFlag(isoCode: string | null): string {
+  if (!isoCode || isoCode.length !== 2) {
+    return "🏳️";
+  }
+  const codePoints = [...isoCode.toUpperCase()].map((char) => 127397 + char.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
+}
 
 function targetLabel(event: AdminUserActivityEventItem) {
   if (!event.targetId) {
@@ -84,8 +121,8 @@ export default function AdminUserActivityPage() {
       accessorKey: "time",
       cell: ({ row }) => (
         <div>
-          <p className="font-medium">{formatRelativeTime(row.original.time)}</p>
-          <p className="text-xs text-muted-foreground">{new Date(row.original.time).toLocaleString()}</p>
+          <p className="font-medium">{formatRelativeTime(parseActivityTime(row.original.time))}</p>
+          <p className="text-xs text-muted-foreground">{formatIST(row.original.time)}</p>
         </div>
       ),
     },
@@ -107,7 +144,25 @@ export default function AdminUserActivityPage() {
     {
       header: "IP",
       accessorKey: "ip",
-      cell: ({ row }) => <span className="font-mono text-xs text-muted-foreground">{row.original.ip}</span>,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1.5">
+          <span title={row.original.country ?? "Unknown country"}>{countryFlag(row.original.country)}</span>
+          <span className="font-mono text-xs text-muted-foreground">{row.original.ip}</span>
+          {row.original.likelyDatacenter ? (
+            <Badge
+              variant="destructive"
+              title="ASN organization name matches a known hosting/cloud provider pattern — an approximate signal, not a confirmed VPN/proxy"
+            >
+              Datacenter/VPN?
+            </Badge>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      header: "Device",
+      accessorKey: "device",
+      cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.device}</span>,
     },
   ], []);
 
@@ -172,7 +227,9 @@ export default function AdminUserActivityPage() {
                 </div>
                 <div>
                   <p className="dashboard-section-label">Joined</p>
-                  <p className="mt-2 text-sm">{new Date(query.data.user.createdAt).toLocaleDateString()}</p>
+                  <p className="mt-2 text-sm">
+                    {new Date(query.data.user.createdAt).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" })}
+                  </p>
                 </div>
               </CardContent>
             </Card>
