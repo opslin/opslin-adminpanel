@@ -201,6 +201,105 @@ class ApiClient {
     }
 
 
+    // Raw-body variant for TUS-style binary chunk uploads (agent-release
+    // artifacts) - unlike patchWithHeaders, never JSON.stringifies the body,
+    // and returns response headers too since Upload-Offset/Upload-Length
+    // come back that way, not in the JSON body.
+    async patchBinary(endpoint: string, body: Blob, headers: HeadersInit = {}): Promise<{ uploadOffset: number; uploadLength: number; status: number }> {
+        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+            method: "PATCH",
+            headers,
+            credentials: "include",
+            body,
+        });
+
+        if (!response.ok && response.status !== 204) {
+            const error = normalizeApiErrorPayload(await response.json().catch(() => null), response.status);
+            throw new ApiRequestError(response.status, error);
+        }
+
+        return {
+            uploadOffset: Number(response.headers.get("upload-offset") || "0"),
+            uploadLength: Number(response.headers.get("upload-length") || "0"),
+            status: response.status,
+        };
+    }
+
+
+    // Agent Release Management (Phase A)
+    async testAgentReleaseStorage(input: AgentReleaseStorageInput) {
+        return this.post<{ success: boolean; message: string }>("/admin/storage/agent-releases/test", input);
+    }
+
+    async saveAgentReleaseStorage(input: AgentReleaseStorageInput) {
+        return this.put<AgentReleaseStorageStatus>("/admin/storage/agent-releases/", input);
+    }
+
+    async getAgentReleaseStorage() {
+        return this.get<AgentReleaseStorageStatus>("/admin/storage/agent-releases/");
+    }
+
+    async createAgentRelease(input: CreateAgentReleaseInput) {
+        return this.post<AgentRelease>("/admin/agent-releases/", input);
+    }
+
+    async getAgentReleases(query: { page?: number; pageSize?: number } = {}) {
+        return this.get<AgentReleaseListResponse>(`/admin/agent-releases/${toQueryString(query)}`);
+    }
+
+    async initAgentReleaseArtifactUpload(releaseId: string, os: string, arch: string, input: { filename: string; uploadLength: number; sha256: string }) {
+        return this.post<AgentReleaseArtifactUploadSession>(
+            `/admin/agent-releases/${releaseId}/artifacts/${os}/${arch}/uploads`,
+            input
+        );
+    }
+
+    async uploadAgentReleaseArtifactChunk(uploadUrl: string, uploadLength: number, offset: number, chunk: Blob) {
+        return this.patchBinary(uploadUrl, chunk, {
+            "Tus-Resumable": "1.0.0",
+            "Upload-Length": String(uploadLength),
+            "Upload-Offset": String(offset),
+            "Content-Type": "application/offset+octet-stream",
+        });
+    }
+
+    async rolloutAgentRelease(releaseId: string) {
+        return this.postWithHeaders<{ rolloutId: string; totalTargeted: number; skippedCount: number }>(
+            `/admin/agent-releases/${releaseId}/rollout`,
+            undefined,
+            { "x-admin-confirm": "ROLLOUT_AGENT_RELEASE" }
+        );
+    }
+
+    async getAgentReleaseRollout(releaseId: string, rolloutId: string) {
+        return this.get<AgentReleaseRolloutProgress>(`/admin/agent-releases/${releaseId}/rollouts/${rolloutId}`);
+    }
+
+    async rollbackAgentRelease(releaseId: string, targetVersion: string) {
+        return this.postWithHeaders<{ rolloutId: string; totalTargeted: number; skippedCount: number }>(
+            `/admin/agent-releases/${releaseId}/rollback`,
+            { targetVersion },
+            { "x-admin-confirm": "ROLLBACK_AGENT_RELEASE" }
+        );
+    }
+
+    async getAgentReleaseErrorRate(releaseId: string) {
+        return this.get<AgentReleaseErrorRate>(`/admin/agent-releases/${releaseId}/error-rate`);
+    }
+
+    async getAgentReleaseDetail(releaseId: string) {
+        return this.get<AgentReleaseDetail>(`/admin/agent-releases/${releaseId}`);
+    }
+
+    // The route itself 302s to a short-lived presigned R2 URL rather than
+    // proxying bytes through the API - this just builds the link so the
+    // browser's own navigation (which carries the httpOnly auth cookie)
+    // can follow the redirect directly, no fetch/blob handling needed.
+    getAgentReleaseArtifactDownloadUrl(releaseId: string, artifactId: string) {
+        return `${this.baseUrl}/admin/agent-releases/${releaseId}/artifacts/${artifactId}/download`;
+    }
+
+
     // Auth
     async login(email: string, password: string) {
         return this.post<{ token: string; user: User }>("/auth/login", {
@@ -2150,4 +2249,128 @@ export interface CreateDatabaseInput {
     name: string;
     type: "postgresql" | "mysql" | "mongodb" | "redis";
     exposure?: "internal" | "public";
+}
+
+// Agent Release Management (Phase A)
+export type AgentReleaseStorageProvider = "aws_s3" | "cloudflare_r2" | "s3_compatible";
+
+export interface AgentReleaseStorageInput {
+    provider: AgentReleaseStorageProvider;
+    bucket: string;
+    region?: string;
+    endpoint?: string;
+    accessKeyId: string;
+    secretAccessKey: string;
+    forcePathStyle?: boolean;
+}
+
+export interface AgentReleaseStorageStatus {
+    configured: boolean;
+    provider?: AgentReleaseStorageProvider;
+    bucket?: string;
+    region?: string | null;
+    endpoint?: string | null;
+    forcePathStyle?: boolean;
+    lastVerifiedAt?: string | null;
+}
+
+export interface CreateAgentReleaseInput {
+    version: string;
+    channel?: "stable" | "beta";
+    criticality?: "optional" | "recommended" | "critical";
+    commit?: string;
+    whyUpdate?: string[];
+    bugFixes?: string[];
+    newFunctions?: string[];
+    vpsChanges?: string[];
+    securityNotes?: string[];
+}
+
+export interface AgentReleaseArtifact {
+    id: string;
+    releaseId: string;
+    os: "linux" | "darwin";
+    arch: "amd64" | "arm64";
+    sha256: string;
+    sizeBytes: number;
+    storageKey: string;
+    uploadedAt: string;
+}
+
+export interface AgentRelease {
+    id: string;
+    version: string;
+    channel: string;
+    criticality: string;
+    status: string;
+    commit: string | null;
+    whyUpdate: string[] | null;
+    bugFixes: string[] | null;
+    newFunctions: string[] | null;
+    vpsChanges: string[] | null;
+    securityNotes: string[] | null;
+    uploadedById: string;
+    uploadedAt: string;
+    rolledOutAt: string | null;
+    artifacts: AgentReleaseArtifact[];
+    serversOnVersion: number;
+}
+
+export interface AgentReleaseListResponse {
+    releases: AgentRelease[];
+    total: number;
+    page: number;
+    pageSize: number;
+}
+
+export interface AgentReleaseArtifactUploadSession {
+    id: string;
+    releaseId: string;
+    os: string;
+    arch: string;
+    filename: string;
+    uploadLength: number;
+    uploadOffset: number;
+    chunkSize: number;
+    status: "pending" | "completed" | "failed";
+    uploadUrl: string;
+}
+
+export interface AgentReleaseErrorRate {
+    version: string;
+    measures: "update_installation_failure_rate";
+    totalUpdateAttempts: number;
+    counts: Record<string, number>;
+    updateFailureRate: number | null;
+}
+
+export interface AgentReleaseRolloutProgress {
+    rolloutId: string;
+    kind: "rollout" | "rollback";
+    totalTargeted: number;
+    skippedCount: number;
+    status: string;
+    triggeredAt: string;
+    completedAt: string | null;
+    counts: Record<string, number>;
+}
+
+// Phase C
+export interface AgentReleaseRolloutRecord {
+    id: string;
+    releaseId: string;
+    kind: "rollout" | "rollback";
+    targetServerIds: string[];
+    totalTargeted: number;
+    skippedCount: number;
+    status: string;
+    triggeredById: string;
+    triggeredAt: string;
+    completedAt: string | null;
+}
+
+export interface AgentReleaseDetail extends Omit<AgentRelease, "serversOnVersion"> {
+    rolledOutById: string | null;
+    rollouts: AgentReleaseRolloutRecord[];
+    errorRate: AgentReleaseErrorRate;
 }
