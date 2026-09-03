@@ -239,6 +239,37 @@ class ApiClient {
         return this.get<AgentReleaseStorageStatus>("/admin/storage/agent-releases/");
     }
 
+    // Deploy Intelligence Layer (Phase 1) — platform-wide AI provider config
+    async testAiConfig(input: AiConfigInput) {
+        return this.post<{ success: boolean; message: string }>("/admin/ai-config/test", input);
+    }
+
+    async saveAiConfig(input: AiConfigInput) {
+        return this.put<AiConfigStatus>("/admin/ai-config/", input);
+    }
+
+    async getAiConfig() {
+        return this.get<AiConfigStatus>("/admin/ai-config/");
+    }
+
+    // Deploy Intelligence Layer (Phase 24) — per-model pricing (for cost
+    // display only, not a credential — no live re-verification) and the
+    // token/cost usage aggregation the founder uses to see spend per stage,
+    // per user, per day.
+    async saveAiPricing(input: AiPricingInput) {
+        return this.patch<AiConfigStatus>("/admin/ai-config/pricing", input);
+    }
+
+    async getAiUsage(rangeDays = 30) {
+        return this.get<AiUsageSummary>(`/admin/ai-config/usage?rangeDays=${rangeDays}`);
+    }
+
+    async getAiUsageEvents(query: { limit?: number; cursor?: string } = {}) {
+        return this.get<AiUsageEventsResponse>(
+            `/admin/ai-config/usage/events${toQueryString(query)}`
+        );
+    }
+
     async createAgentRelease(input: CreateAgentReleaseInput) {
         return this.post<AgentRelease>("/admin/agent-releases/", input);
     }
@@ -2274,6 +2305,98 @@ export interface AgentReleaseStorageStatus {
     lastVerifiedAt?: string | null;
 }
 
+// Deploy Intelligence Layer (Phase 1)
+export type AiConfigProvider = "anthropic" | "openai_compatible";
+
+export interface AiConfigInput {
+    provider: AiConfigProvider;
+    model: string;
+    apiKey: string;
+    baseUrl?: string;
+}
+
+export interface AiConfigStatus {
+    configured: boolean;
+    provider?: AiConfigProvider;
+    model?: string;
+    baseUrl?: string | null;
+    lastVerifiedAt?: string | null;
+    updatedAt?: string;
+    // DIL Phase 24 — null/unset shows as "cost unknown" rather than a
+    // fabricated number anywhere this status is used.
+    inputCostPerMillionUsd?: number | null;
+    outputCostPerMillionUsd?: number | null;
+    usdToInrRate?: number | null;
+}
+
+// Deploy Intelligence Layer (Phase 24) — token/cost usage tracking
+export interface AiPricingInput {
+    inputCostPerMillionUsd?: number | null;
+    outputCostPerMillionUsd?: number | null;
+    usdToInrRate?: number | null;
+}
+
+export interface AiUsageBucket {
+    calls: number;
+    inputTokens: number;
+    outputTokens: number;
+    costUsd: number | null;
+}
+
+export interface AiUsageByStage extends AiUsageBucket {
+    stage: string;
+}
+
+export interface AiUsageByUser extends AiUsageBucket {
+    userId: string | null;
+    name: string;
+    email: string | null;
+}
+
+export interface AiUsageByDay extends AiUsageBucket {
+    date: string;
+}
+
+export interface AiUsageSummary {
+    rangeDays: number;
+    costKnown: boolean;
+    pricing: {
+        inputCostPerMillionUsd: number | null;
+        outputCostPerMillionUsd: number | null;
+        usdToInrRate: number | null;
+    };
+    totals: {
+        calls: number;
+        inputTokens: number;
+        outputTokens: number;
+        costUsd: number | null;
+        costInr: number | null;
+        unattributedCalls: number;
+    };
+    byStage: AiUsageByStage[];
+    byUser: AiUsageByUser[];
+    byDay: AiUsageByDay[];
+}
+
+export interface AiUsageEventItem {
+    id: string;
+    stage: string;
+    provider: string;
+    model: string;
+    inputTokens: number;
+    outputTokens: number;
+    jobId: string | null;
+    userId: string | null;
+    userName: string | null;
+    userEmail: string | null;
+    createdAt: string;
+}
+
+export interface AiUsageEventsResponse {
+    events: AiUsageEventItem[];
+    nextCursor: string | null;
+}
+
 export interface CreateAgentReleaseInput {
     version: string;
     channel?: "stable" | "beta";
@@ -2369,8 +2492,26 @@ export interface AgentReleaseRolloutRecord {
     completedAt: string | null;
 }
 
+// Phase D
+export interface AgentReleaseSmokeTestRecord {
+    id: string;
+    releaseId: string;
+    artifactId: string;
+    os: string;
+    arch: string;
+    status: "pending" | "running" | "passed" | "failed" | "timed_out" | "error";
+    serverId: string | null;
+    connected: boolean;
+    handshakeReceived: boolean;
+    reportedVersion: string | null;
+    failureReason: string | null;
+    startedAt: string;
+    completedAt: string | null;
+}
+
 export interface AgentReleaseDetail extends Omit<AgentRelease, "serversOnVersion"> {
     rolledOutById: string | null;
     rollouts: AgentReleaseRolloutRecord[];
+    smokeTests: AgentReleaseSmokeTestRecord[];
     errorRate: AgentReleaseErrorRate;
 }

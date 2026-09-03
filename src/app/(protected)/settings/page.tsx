@@ -3,12 +3,24 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { CheckCircle2, HardDrive, Loader2, Settings, ShieldAlert, ShieldCheck, Users, XCircle } from "lucide-react";
+import {
+  Bot,
+  CheckCircle2,
+  Coins,
+  HardDrive,
+  Loader2,
+  Settings,
+  ShieldAlert,
+  ShieldCheck,
+  Users,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { DataTable } from "@/components/admin/data-table";
 import { EmptyState } from "@/components/admin/empty-state";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { ChartLoading, useRecharts } from "@/components/charts/use-recharts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +28,32 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { api, type AgentReleaseStorageInput, type AgentReleaseStorageProvider } from "@/lib/api";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  api,
+  type AgentReleaseStorageInput,
+  type AgentReleaseStorageProvider,
+  type AiConfigInput,
+  type AiConfigProvider,
+  type AiPricingInput,
+  type AiUsageSummary,
+} from "@/lib/api";
+
+function formatUsd(value: number | null) {
+  if (value === null) return "—";
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: value < 1 ? 4 : 2 }).format(value);
+}
+
+function formatInr(value: number | null) {
+  if (value === null) return "—";
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(value);
+}
+
+function formatTokens(value: number) {
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return String(value);
+}
 
 const storageProviderOptions: { value: AgentReleaseStorageProvider; label: string; needsEndpoint: boolean }[] = [
   { value: "cloudflare_r2", label: "Cloudflare R2", needsEndpoint: true },
@@ -244,6 +281,517 @@ function AgentReleaseStorageCard() {
   );
 }
 
+const aiProviderOptions: { value: AiConfigProvider; label: string; needsBaseUrl: boolean }[] = [
+  { value: "anthropic", label: "Anthropic", needsBaseUrl: false },
+  { value: "openai_compatible", label: "OpenAI-compatible (OpenAI, OpenRouter, self-hosted)", needsBaseUrl: true },
+];
+
+// Session recommendation, not a mandate — see docs/audit/22 canon doc. The
+// founder can change provider/model here at any time; nothing in DIL's code
+// requires a redeploy to switch.
+const DEFAULT_MODEL_BY_PROVIDER: Record<AiConfigProvider, string> = {
+  anthropic: "claude-sonnet-5",
+  openai_compatible: "",
+};
+
+function AiConfigCard() {
+  const queryClient = useQueryClient();
+  const [provider, setProvider] = useState<AiConfigProvider>("anthropic");
+  const [model, setModel] = useState(DEFAULT_MODEL_BY_PROVIDER.anthropic);
+  const [baseUrl, setBaseUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const providerMeta = aiProviderOptions.find((option) => option.value === provider) || aiProviderOptions[0];
+
+  const { data: status, isLoading } = useQuery({
+    queryKey: ["admin", "aiConfig"],
+    queryFn: () => api.getAiConfig(),
+  });
+
+  const currentInput = (): AiConfigInput => ({
+    provider,
+    model: model.trim(),
+    apiKey,
+    baseUrl: providerMeta.needsBaseUrl ? baseUrl.trim() || undefined : undefined,
+  });
+
+  function invalidatePriorTest() {
+    setTestResult(null);
+  }
+
+  const testMutation = useMutation({
+    mutationFn: () => api.testAiConfig(currentInput()),
+    onSuccess: (result) => {
+      setTestResult(result);
+      if (result.success) {
+        toast.success("The model responded successfully");
+      } else {
+        toast.error(result.message);
+      }
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Could not test the connection";
+      setTestResult({ success: false, message });
+      toast.error(message);
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: () => api.saveAiConfig(currentInput()),
+    onSuccess: () => {
+      toast.success("AI provider configured");
+      setApiKey("");
+      setTestResult(null);
+      queryClient.invalidateQueries({ queryKey: ["admin", "aiConfig"] });
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Unable to save AI provider config");
+    },
+  });
+
+  // baseUrl is always optional (even for openai_compatible — omitting it
+  // defaults to the real OpenAI API in ai-client.ts), so it never gates
+  // submission.
+  const canSubmit = model.trim().length > 0 && apiKey.trim().length > 0;
+
+  return (
+    <Card className="rounded-lg py-0">
+      <CardHeader className="border-b border-border/80 px-4 py-3">
+        <div className="flex items-center justify-between gap-4">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Bot className="size-4 text-muted-foreground" />
+            Deploy Intelligence — AI provider
+          </CardTitle>
+          {!isLoading && (
+            <Badge variant={status?.configured ? "default" : "secondary"}>
+              {status?.configured ? "Configured" : "Not configured"}
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5 p-4">
+        <p className="text-xs text-muted-foreground">
+          The model behind Deploy Intelligence&apos;s AI-assisted stages (repo analysis, Dockerfile authoring,
+          failure diagnosis) — tested live before it&apos;s ever saved, applies platform-wide across every org.
+        </p>
+
+        {status?.configured && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-border/70 bg-secondary/30 p-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Provider</p>
+              <p className="mt-1 font-medium text-foreground">
+                {aiProviderOptions.find((option) => option.value === status.provider)?.label || status.provider}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border/70 bg-secondary/30 p-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Model</p>
+              <p className="mt-1 truncate font-medium text-foreground">{status.model}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Provider</Label>
+            <Select
+              value={provider}
+              onValueChange={(value) => {
+                const nextProvider = value as AiConfigProvider;
+                setProvider(nextProvider);
+                setModel(DEFAULT_MODEL_BY_PROVIDER[nextProvider]);
+                invalidatePriorTest();
+              }}
+            >
+              <SelectTrigger className="h-9 border-border/60 bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {aiProviderOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="ai-config-model">Model</Label>
+            <Input
+              id="ai-config-model"
+              value={model}
+              onChange={(event) => { setModel(event.target.value); invalidatePriorTest(); }}
+              placeholder="claude-sonnet-5"
+            />
+          </div>
+        </div>
+
+        {providerMeta.needsBaseUrl && (
+          <div className="space-y-2">
+            <Label htmlFor="ai-config-base-url">Base URL (optional)</Label>
+            <Input
+              id="ai-config-base-url"
+              value={baseUrl}
+              onChange={(event) => { setBaseUrl(event.target.value); invalidatePriorTest(); }}
+              placeholder="https://openrouter.ai/api/v1 — leave blank for the real OpenAI API"
+            />
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor="ai-config-api-key">API key</Label>
+          <Input
+            id="ai-config-api-key"
+            type="password"
+            value={apiKey}
+            onChange={(event) => { setApiKey(event.target.value); invalidatePriorTest(); }}
+            autoComplete="off"
+          />
+        </div>
+
+        {testResult && (
+          <div
+            className={`flex items-start gap-3 rounded-xl border p-4 text-sm ${
+              testResult.success
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                : "border-destructive/30 bg-destructive/10 text-destructive"
+            }`}
+          >
+            {testResult.success ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <XCircle className="mt-0.5 size-4 shrink-0" />}
+            <span>{testResult.message}</span>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={() => testMutation.mutate()}
+            disabled={!canSubmit || testMutation.isPending}
+            className="w-full sm:w-fit"
+          >
+            {testMutation.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : <ShieldAlert className="mr-2 size-4" />}
+            Test connection
+          </Button>
+          <Button
+            onClick={() => saveMutation.mutate()}
+            disabled={!canSubmit || !testResult?.success || saveMutation.isPending}
+            className="w-full sm:w-fit"
+          >
+            {saveMutation.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+            Save
+          </Button>
+        </div>
+        {canSubmit && !testResult?.success && (
+          <p className="text-xs text-muted-foreground">Run a successful test first — a broken key is never saved.</p>
+        )}
+
+        {status?.configured && <AiPricingForm status={status} />}
+      </CardContent>
+    </Card>
+  );
+}
+
+// DIL Phase 24 — the model's own published per-million-token price, entered
+// once so /admin/ai-config/usage can compute real cost instead of just
+// reporting raw token counts. Not a credential, so no live re-verification —
+// a plain in-place PATCH.
+function AiPricingForm({ status }: { status: { inputCostPerMillionUsd?: number | null; outputCostPerMillionUsd?: number | null; usdToInrRate?: number | null } }) {
+  const queryClient = useQueryClient();
+  const [inputCost, setInputCost] = useState(status.inputCostPerMillionUsd?.toString() ?? "");
+  const [outputCost, setOutputCost] = useState(status.outputCostPerMillionUsd?.toString() ?? "");
+  const [inrRate, setInrRate] = useState(status.usdToInrRate?.toString() ?? "");
+
+  const parseOrNull = (value: string): number | null | undefined => {
+    if (value.trim() === "") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const input: AiPricingInput = {
+        inputCostPerMillionUsd: parseOrNull(inputCost),
+        outputCostPerMillionUsd: parseOrNull(outputCost),
+        usdToInrRate: parseOrNull(inrRate),
+      };
+      return api.saveAiPricing(input);
+    },
+    onSuccess: () => {
+      toast.success("Pricing saved — usage & cost will reflect it immediately");
+      queryClient.invalidateQueries({ queryKey: ["admin", "aiConfig"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "aiUsage"] });
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Unable to save pricing");
+    },
+  });
+
+  const hasInvalidValue = [inputCost, outputCost, inrRate].some((value) => parseOrNull(value) === undefined);
+
+  return (
+    <div className="space-y-3 rounded-xl border border-border/70 bg-secondary/20 p-4">
+      <div className="flex items-center gap-2">
+        <Coins className="size-4 text-muted-foreground" />
+        <p className="text-sm font-medium">Pricing (for cost tracking)</p>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        The model&apos;s published per-million-token price — used only to compute cost in the Usage &amp; cost section below. Leave blank to leave cost unknown.
+      </p>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="space-y-2">
+          <Label htmlFor="ai-pricing-input">Input $ / 1M tokens</Label>
+          <Input id="ai-pricing-input" type="number" min="0" step="0.01" value={inputCost} onChange={(event) => setInputCost(event.target.value)} placeholder="0.20" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="ai-pricing-output">Output $ / 1M tokens</Label>
+          <Input id="ai-pricing-output" type="number" min="0" step="0.01" value={outputCost} onChange={(event) => setOutputCost(event.target.value)} placeholder="0.80" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="ai-pricing-inr">USD → INR rate</Label>
+          <Input id="ai-pricing-inr" type="number" min="0" step="0.01" value={inrRate} onChange={(event) => setInrRate(event.target.value)} placeholder="88" />
+        </div>
+      </div>
+      <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || hasInvalidValue}>
+        {saveMutation.isPending ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
+        Save pricing
+      </Button>
+    </div>
+  );
+}
+
+const USAGE_RANGE_OPTIONS = [
+  { value: "7", label: "Last 7 days" },
+  { value: "30", label: "Last 30 days" },
+  { value: "90", label: "Last 90 days" },
+];
+
+// DIL Phase 24 — per-user, per-deployment AI token/cost visibility, so the
+// founder can see exactly how much every deploy's AI-assisted stages
+// (analyze/author/diagnose) actually cost, not just that they ran.
+function AiUsageTrendChart({ data, costKnown }: { data: AiUsageSummary["byDay"]; costKnown: boolean }) {
+  const recharts = useRecharts();
+
+  if (!recharts) {
+    return <ChartLoading className="h-64" />;
+  }
+
+  const { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } = recharts;
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} />
+        <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={24} />
+        <YAxis tick={{ fontSize: 11 }} allowDecimals={costKnown} />
+        <Tooltip formatter={(value) => (costKnown ? formatUsd(Number(value)) : value)} />
+        <Bar dataKey={costKnown ? "costUsd" : "calls"} fill="#2563eb" name={costKnown ? "Cost (USD)" : "Calls"} radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function AiUsageCard() {
+  const [rangeDays, setRangeDays] = useState("30");
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["admin", "aiUsage", rangeDays],
+    queryFn: () => api.getAiUsage(Number(rangeDays)),
+  });
+
+  return (
+    <Card className="rounded-lg py-0">
+      <CardHeader className="border-b border-border/80 px-4 py-3">
+        <div className="flex items-center justify-between gap-4">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Coins className="size-4 text-muted-foreground" />
+            Deploy Intelligence — usage &amp; cost
+          </CardTitle>
+          <Select value={rangeDays} onValueChange={setRangeDays}>
+            <SelectTrigger className="h-8 w-40 border-border/60 bg-background text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {USAGE_RANGE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-5 p-4">
+        {isError && (
+          <EmptyState icon={Coins} title="Usage data unavailable" description="The AI usage endpoint failed to respond." />
+        )}
+
+        {!isError && (
+          <>
+            {!data?.costKnown && !isLoading && (
+              <p className="text-xs text-muted-foreground">
+                Cost is unknown — set the pricing above to see real USD/INR spend instead of just token counts.
+              </p>
+            )}
+
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-xl border border-border/70 bg-secondary/30 p-3">
+                <p className="text-xs font-medium uppercase text-muted-foreground">AI calls</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">{isLoading ? "…" : data?.totals.calls ?? 0}</p>
+              </div>
+              <div className="rounded-xl border border-border/70 bg-secondary/30 p-3">
+                <p className="text-xs font-medium uppercase text-muted-foreground">Tokens (in / out)</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">
+                  {isLoading ? "…" : `${formatTokens(data?.totals.inputTokens ?? 0)} / ${formatTokens(data?.totals.outputTokens ?? 0)}`}
+                </p>
+              </div>
+              <div className="rounded-xl border border-border/70 bg-secondary/30 p-3">
+                <p className="text-xs font-medium uppercase text-muted-foreground">Cost (USD / INR)</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">
+                  {isLoading ? "…" : `${formatUsd(data?.totals.costUsd ?? null)} / ${formatInr(data?.totals.costInr ?? null)}`}
+                </p>
+              </div>
+              <div className="rounded-xl border border-border/70 bg-secondary/30 p-3">
+                <p className="text-xs font-medium uppercase text-muted-foreground">Unattributed calls</p>
+                <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">{isLoading ? "…" : data?.totals.unattributedCalls ?? 0}</p>
+              </div>
+            </div>
+
+            <div className="h-64">
+              {isLoading ? <ChartLoading className="h-64" /> : <AiUsageTrendChart data={data?.byDay ?? []} costKnown={data?.costKnown ?? false} />}
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase text-muted-foreground">By stage</p>
+                <div className="rounded-xl border border-border/70">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Stage</TableHead>
+                        <TableHead className="text-right">Calls</TableHead>
+                        <TableHead className="text-right">Cost</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(data?.byStage.length ?? 0) === 0 && !isLoading ? (
+                        <TableRow><TableCell colSpan={3} className="text-center text-xs text-muted-foreground">No AI calls in this range</TableCell></TableRow>
+                      ) : (
+                        data?.byStage.map((row) => (
+                          <TableRow key={row.stage}>
+                            <TableCell className="capitalize">{row.stage}</TableCell>
+                            <TableCell className="text-right tabular-nums">{row.calls}</TableCell>
+                            <TableCell className="text-right tabular-nums">{formatUsd(row.costUsd)}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="flex items-center gap-1 text-xs font-medium uppercase text-muted-foreground">
+                  <Users className="size-3" /> By user — top spenders
+                </p>
+                <div className="rounded-xl border border-border/70">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>User</TableHead>
+                        <TableHead className="text-right">Calls</TableHead>
+                        <TableHead className="text-right">Cost</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(data?.byUser.length ?? 0) === 0 && !isLoading ? (
+                        <TableRow><TableCell colSpan={3} className="text-center text-xs text-muted-foreground">No AI calls in this range</TableCell></TableRow>
+                      ) : (
+                        data?.byUser.slice(0, 8).map((row) => (
+                          <TableRow key={row.userId ?? "unattributed"}>
+                            <TableCell>
+                              <span className="font-medium">{row.name}</span>
+                              {row.email && <span className="ml-1 text-xs text-muted-foreground">{row.email}</span>}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">{row.calls}</TableCell>
+                            <TableCell className="text-right tabular-nums">{formatUsd(row.costUsd)}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </div>
+
+            <AiUsageEventsTable />
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// Raw "show me exactly what happened" drill-down beneath the aggregates
+// above — one row per real AI call, cursor-paginated.
+function AiUsageEventsTable() {
+  const [cursors, setCursors] = useState<(string | undefined)[]>([undefined]);
+  const page = cursors.length - 1;
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin", "aiUsageEvents", cursors[page]],
+    queryFn: () => api.getAiUsageEvents({ limit: 20, cursor: cursors[page] }),
+  });
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-medium uppercase text-muted-foreground">Recent AI calls</p>
+      <div className="rounded-xl border border-border/70">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>When</TableHead>
+              <TableHead>Stage</TableHead>
+              <TableHead>Model</TableHead>
+              <TableHead>User</TableHead>
+              <TableHead className="text-right">Tokens (in / out)</TableHead>
+              <TableHead>Job</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground">Loading…</TableCell></TableRow>
+            ) : (data?.events.length ?? 0) === 0 ? (
+              <TableRow><TableCell colSpan={6} className="text-center text-xs text-muted-foreground">No AI calls yet</TableCell></TableRow>
+            ) : (
+              data?.events.map((event) => (
+                <TableRow key={event.id}>
+                  <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{new Date(event.createdAt).toLocaleString()}</TableCell>
+                  <TableCell className="capitalize">{event.stage}</TableCell>
+                  <TableCell className="max-w-48 truncate text-xs">{event.model}</TableCell>
+                  <TableCell className="text-xs">{event.userName ?? "Unattributed"}</TableCell>
+                  <TableCell className="text-right tabular-nums text-xs">{formatTokens(event.inputTokens)} / {formatTokens(event.outputTokens)}</TableCell>
+                  <TableCell className="max-w-24 truncate text-xs text-muted-foreground">{event.jobId ?? "—"}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="flex items-center justify-between">
+        <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setCursors((prev) => prev.slice(0, -1))}>
+          Previous
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!data?.nextCursor}
+          onClick={() => setCursors((prev) => [...prev, data?.nextCursor ?? undefined])}
+        >
+          Next
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 type AdminUser = {
   id: string;
   name: string;
@@ -338,6 +886,8 @@ export default function AdminSettingsPage() {
       </Card>
 
       <AgentReleaseStorageCard />
+      <AiConfigCard />
+      <AiUsageCard />
 
       {adminUsers.isError ? (
         <EmptyState icon={Settings} title="Admin users unavailable" description="The admin users endpoint failed to respond." />

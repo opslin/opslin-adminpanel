@@ -97,7 +97,17 @@ function StatusPill({ status }: { status: string }) {
     rolled_out: "default",
     uploaded: "secondary",
     rolled_back: "destructive",
+    smoke_testing: "secondary",
+    smoke_passed: "default",
     smoke_failed: "destructive",
+    // AgentReleaseSmokeTest's own status values (distinct from the release-
+    // level "smoke_*" ones above, no naming collision).
+    pending: "secondary",
+    running: "secondary",
+    passed: "default",
+    failed: "destructive",
+    timed_out: "destructive",
+    error: "destructive",
   };
   return <Badge variant={tone[status] || "secondary"}>{status.replace(/_/g, " ")}</Badge>;
 }
@@ -259,7 +269,14 @@ export default function AgentReleasesPage() {
           <Button
             variant="outline"
             size="sm"
-            disabled={row.original.artifacts.length === 0}
+            disabled={row.original.artifacts.length === 0 || row.original.status !== "smoke_passed"}
+            title={
+              row.original.artifacts.length === 0
+                ? "Upload artifacts first"
+                : row.original.status !== "smoke_passed"
+                  ? `Blocked until the pre-rollout smoke test passes (current status: ${row.original.status.replace(/_/g, " ")})`
+                  : undefined
+            }
             onClick={(event) => {
               event.stopPropagation();
               setRolloutTarget(row.original);
@@ -532,6 +549,38 @@ export default function AgentReleasesPage() {
                       : `${Math.round((releaseDetailQuery.data.errorRate.updateFailureRate ?? 0) * 1000) / 10}% (${releaseDetailQuery.data.errorRate.totalUpdateAttempts} attempts)`}
                   </p>
                 </div>
+              </div>
+
+              <div className="rounded-lg border border-border/70 p-3">
+                <p className="mb-1.5 text-xs font-medium text-muted-foreground">Pre-rollout smoke test</p>
+                {releaseDetailQuery.data.smokeTests.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No smoke test has run yet — only uploading the linux/amd64 artifact triggers one.
+                  </p>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusPill status={releaseDetailQuery.data.smokeTests[0].status} />
+                      <span className="text-xs text-muted-foreground">
+                        {releaseDetailQuery.data.smokeTests[0].os}-{releaseDetailQuery.data.smokeTests[0].arch}
+                      </span>
+                      {releaseDetailQuery.data.smokeTests[0].reportedVersion ? (
+                        <span className="text-xs text-muted-foreground">
+                          reported version {releaseDetailQuery.data.smokeTests[0].reportedVersion}
+                        </span>
+                      ) : null}
+                    </div>
+                    {releaseDetailQuery.data.smokeTests[0].failureReason ? (
+                      <p className="mt-1.5 text-xs text-destructive">{releaseDetailQuery.data.smokeTests[0].failureReason}</p>
+                    ) : null}
+                    <p className="mt-1.5 text-xs text-muted-foreground">
+                      Started {new Date(releaseDetailQuery.data.smokeTests[0].startedAt).toLocaleString()}
+                      {releaseDetailQuery.data.smokeTests[0].completedAt
+                        ? ` · completed ${new Date(releaseDetailQuery.data.smokeTests[0].completedAt).toLocaleString()}`
+                        : " · in progress"}
+                    </p>
+                  </>
+                )}
               </div>
 
               {([
