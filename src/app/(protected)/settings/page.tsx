@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { AiDeployCostCard } from "@/components/admin/ai-deploy-cost-card";
 import { DataTable } from "@/components/admin/data-table";
 import { EmptyState } from "@/components/admin/empty-state";
 import { StatusBadge } from "@/components/admin/status-badge";
@@ -887,6 +888,7 @@ export default function AdminSettingsPage() {
 
       <AgentReleaseStorageCard />
       <AiConfigCard />
+      <AiDeployCostCard />
       <AiUsageCard />
 
       {adminUsers.isError ? (

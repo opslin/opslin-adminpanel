@@ -264,6 +264,10 @@ class ApiClient {
         return this.get<AiUsageSummary>(`/admin/ai-config/usage?rangeDays=${rangeDays}`);
     }
 
+    async getAiDeployCosts(rangeDays = 30) {
+        return this.get<AiDeployCosts>(`/admin/ai-config/usage/deploys?rangeDays=${rangeDays}`);
+    }
+
     async getAiUsageEvents(query: { limit?: number; cursor?: string } = {}) {
         return this.get<AiUsageEventsResponse>(
             `/admin/ai-config/usage/events${toQueryString(query)}`
@@ -2376,6 +2380,37 @@ export interface AiUsageSummary {
     byStage: AiUsageByStage[];
     byUser: AiUsageByUser[];
     byDay: AiUsageByDay[];
+}
+
+export interface AiDeployCostRow {
+    jobId: string;
+    repo: string | null;
+    status: string | null;
+    durationSeconds: number | null;
+    calls: number;
+    inputTokens: number;
+    outputTokens: number;
+    models: string[];
+    byStage: Array<{ stage: string; calls: number }>;
+    costUsd: number | null;
+    costInr: number | null;
+    at: string;
+}
+
+export interface AiDeployCosts {
+    rangeDays: number;
+    usdToInrRate: number | null;
+    summary: {
+        deploys: number;
+        unpricedDeploys: number;
+        totalCostUsd: number | null;
+        averageCostUsdPerDeploy: number | null;
+        totalInputTokens: number;
+        totalOutputTokens: number;
+        callsWithoutDeploy: number;
+    };
+    prices: Array<{ model: string; inputPerMillionUsd: number | null; outputPerMillionUsd: number | null; source: "published" | "admin" | null }>;
+    deploys: AiDeployCostRow[];
 }
 
 export interface AiUsageEventItem {
