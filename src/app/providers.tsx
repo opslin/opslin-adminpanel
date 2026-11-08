@@ -2,12 +2,12 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
-import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/sonner";
 
-// Admin console is always dark (matches the prior (admin)/layout.tsx
-// behavior, which forced a `dark` class regardless of the user's stored
-// dashboard theme preference) — no system detection, no light option.
+// Theme (light/dark) is owned by BoardUI's ThemeToggle — it toggles the
+// `.dark` class on <html> directly, persists to localStorage under
+// "boardui:theme", and a pre-paint script in layout.tsx applies the stored
+// value before hydration to avoid a flash. Light is the default.
 export function Providers({ children }: { children: React.ReactNode }) {
     const [queryClient] = useState(
         () =>
@@ -22,15 +22,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     );
 
     return (
-        <ThemeProvider
-            attribute="class"
-            forcedTheme="dark"
-            disableTransitionOnChange
-        >
-            <QueryClientProvider client={queryClient}>
-                {children}
-                <Toaster position="top-right" />
-            </QueryClientProvider>
-        </ThemeProvider>
+        <QueryClientProvider client={queryClient}>
+            {children}
+            <Toaster position="top-right" />
+        </QueryClientProvider>
     );
 }

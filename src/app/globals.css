@@ -1,15 +1,11 @@
+/* BoardUI entry: tailwindcss + theme/typography tokens + dark variant + base. */
+@import "../styles/globals.css";
 @import "../styles/tokens.css";
-@import "tailwindcss";
 @import "tw-animate-css";
-@config "../../tailwind.config.ts";
-
-@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans-ui);
-  --font-mono: var(--font-mono-ui);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -74,19 +70,9 @@
   --color-text-on-inverse-muted: var(--opslin-text-on-inverse-muted);
   --color-border-inverse: var(--opslin-border-inverse);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
 }
 
 @layer base {
-  html {
-    color-scheme: light dark;
-  }
   * {
     @apply border-border outline-ring/50;
   }

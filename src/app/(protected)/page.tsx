@@ -1,216 +1,62 @@
 "use client";
 
-import { useEffect } from "react";
-import Link from "next/link";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Activity,
-  AppWindow,
-  Building2,
-  Clock3,
-  Gauge,
-  Server,
-  ShieldCheck,
-  TrendingUp,
-  UserPlus,
-  Users,
-  Workflow,
-} from "lucide-react";
+import { RiCheckboxCircleLine, RiCoinsFill, RiGroupLine, RiRocketLine } from "@remixicon/react";
 
-import { StatCard } from "@/components/admin/stat-card";
-import { StatusBadge, type BadgeStatus } from "@/components/admin/status-badge";
-import { ChartLoading, useRecharts } from "@/components/charts/use-recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusBadge } from "@/components/admin/status-badge";
+import { RefreshButton } from "@/components/admin/refresh-button";
+import { StatCards, type Stat } from "@/components/application/dashboard/stat-cards";
+import { Skeleton } from "@/components/base/skeleton/skeleton";
+import { LiveDeploys, RecentDeploys, RecentSignups } from "@/components/overview/activity";
+import { DeployChart } from "@/components/overview/deploy-chart";
+import { FunnelCard } from "@/components/overview/funnel-card";
+import { FailuresCard, FleetCard, PlatformHealthCard } from "@/components/overview/health-cards";
+import { LiveStrip } from "@/components/overview/live-strip";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  formatMoney,
+  formatNumber,
+  percentDelta,
+  type AgentMetricsResponse,
+  type ErrorsResponse,
+  type FunnelResponse,
+  type OverviewResponse,
+  type RunningDeploymentsResponse,
+  type SystemHealthResponse,
+} from "@/components/overview/shared";
 import { api } from "@/lib/api";
-import { formatRelativeTime } from "@/lib/utils";
 
-type OverviewResponse = {
-  totals: {
-    users: number;
-    servers: number;
-    apps: number;
-    deployments24h: number;
-    activeSubscriptions: number;
-  };
-  performance: {
-    successRate: number;
-    avgDeployTimeMs: number;
-  };
-  deploys30d: Array<{
-    date: string;
-    total: number;
-    succeeded: number;
-    failed: number;
-  }>;
-  newUsersToday: number;
-  activeUsers7d: number;
-  totalOrgs: number;
-  connectedAgents: number;
-  disconnectedAgents: number;
-  deploySuccessRate24h: number;
-  deploySuccessRate7d: number;
-  queueWaitAvg: number;
-  queueWaitP95: number;
-  workerCountExpected: number;
-  systemHealth: {
-    api: "ok" | "error";
-    db: "ok" | "error";
-    redis: "ok" | "error";
-  };
-  recentDeployments: Array<{
-    id: string;
-    appName: string | null;
-    status: string;
-    startedAt: string;
-    finishedAt: string | null;
-  }>;
-  recentSignups: Array<{
-    id: string;
-    name: string;
-    email: string;
-    createdAt: string;
-  }>;
-};
+const DAY = 24 * 60 * 60 * 1000;
 
-function formatMs(ms: number) {
-  if (ms >= 60_000) {
-    return `${Math.round(ms / 60_000)}m`;
-  }
-  if (ms >= 1000) {
-    return `${Math.round(ms / 100) / 10}s`;
-  }
-  return `${ms}ms`;
+function startOfMonth(offsetMonths: number) {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth() + offsetMonths, 1);
 }
 
-function systemStatus(health?: OverviewResponse["systemHealth"]): BadgeStatus {
-  if (!health) {
-    return "offline";
-  }
-  return health.api === "ok" && health.db === "ok" && health.redis === "ok" ? "ok" : "error";
+function deltaPill(delta: number | null): Pick<Stat, "delta" | "deltaColor"> {
+  if (delta === null) return { delta: "—", deltaColor: "neutral" };
+  return { delta: `${Math.abs(delta)}%`, deltaColor: delta >= 0 ? "lime" : "rose" };
 }
 
-function DeployVolumeChart({ data }: { data: OverviewResponse["deploys30d"] }) {
-  const recharts = useRecharts();
-  const chartData = data.slice(-7).map((point) => ({
-    ...point,
-    label: new Date(point.date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-  }));
+function sumLastDays(data: OverviewResponse["deploys30d"], days: number, offsetFromEnd = 0) {
+  return data
+    .slice(Math.max(0, data.length - offsetFromEnd - days), Math.max(0, data.length - offsetFromEnd))
+    .reduce((sum, point) => sum + point.total, 0);
+}
 
-  if (!recharts) {
-    return <ChartLoading className="h-72" />;
-  }
-
-  const { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } = recharts;
-
+function LoadingOverview() {
   return (
-    <div className="h-72">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={chartData} margin={{ top: 12, right: 12, left: -18, bottom: 0 }}>
-          <CartesianGrid stroke="var(--border)" vertical={false} opacity={0.25} />
-          <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fill: "currentColor", fontSize: 12 }} />
-          <YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{ fill: "currentColor", fontSize: 12 }} />
-          <Tooltip
-            cursor={{ fill: "rgba(255,255,255,0.04)" }}
-            contentStyle={{
-              background: "var(--card)",
-              border: "1px solid var(--border)",
-              borderRadius: 8,
-              color: "var(--foreground)",
-            }}
-          />
-          <Bar dataKey="succeeded" stackId="deploys" fill="var(--chart-5)" radius={[0, 0, 3, 3]} />
-          <Bar dataKey="failed" stackId="deploys" fill="var(--chart-3)" radius={[3, 3, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
-
-function RecentDeployments({ deployments }: { deployments: OverviewResponse["recentDeployments"] }) {
-  return (
-    <Card className="rounded-lg py-0">
-      <CardHeader className="border-b border-border/80 px-4 py-3">
-        <CardTitle className="text-sm">Recent Deploys</CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>App</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Started</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {deployments.slice(0, 10).map((deployment) => (
-              <TableRow key={deployment.id}>
-                <TableCell className="font-medium">{deployment.appName ?? "Unknown app"}</TableCell>
-                <TableCell>
-                  <StatusBadge
-                    status={deployment.status === "SUCCEEDED" ? "ok" : deployment.status === "FAILED" ? "error" : "info"}
-                    label={deployment.status.toLowerCase()}
-                  />
-                </TableCell>
-                <TableCell className="text-muted-foreground">{formatRelativeTime(deployment.startedAt)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        <Link href="/deployments" className="block border-t border-border/80 px-4 py-3 text-sm text-primary">
-          View all deploys
-        </Link>
-      </CardContent>
-    </Card>
-  );
-}
-
-function RecentSignups({ signups }: { signups: OverviewResponse["recentSignups"] }) {
-  return (
-    <Card className="rounded-lg py-0">
-      <CardHeader className="border-b border-border/80 px-4 py-3">
-        <CardTitle className="text-sm">Recent Signups</CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Created</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {signups.slice(0, 10).map((user) => (
-              <TableRow key={user.id}>
-                <TableCell className="font-medium">{user.name}</TableCell>
-                <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                <TableCell className="text-muted-foreground">{formatRelativeTime(user.createdAt)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        <Link href="/users" className="block border-t border-border/80 px-4 py-3 text-sm text-primary">
-          View all users
-        </Link>
-      </CardContent>
-    </Card>
-  );
-}
-
-function LoadingGrid() {
-  return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      {Array.from({ length: 11 }).map((_, index) => (
-        <div key={index} className="h-36 animate-pulse rounded-lg border border-border/80 bg-card" />
-      ))}
+    <div className="flex flex-col gap-6">
+      <Skeleton className="h-24 rounded-3xl" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Skeleton key={index} className="h-[210px] rounded-2xl" />
+        ))}
+      </div>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Skeleton className="h-96 rounded-3xl" />
+        <Skeleton className="h-96 rounded-3xl" />
+      </div>
     </div>
   );
 }
@@ -219,64 +65,168 @@ export default function AdminOverviewPage() {
   const overview = useQuery({
     queryKey: ["admin", "overview"],
     queryFn: () => api.get<OverviewResponse>("/admin"),
+    refetchInterval: 30_000,
+  });
+  const running = useQuery({
+    queryKey: ["admin", "overview", "running"],
+    queryFn: () => api.get<RunningDeploymentsResponse>("/admin/deployments?status=running&pageSize=6"),
+    refetchInterval: 10_000,
+  });
+  const system = useQuery({
+    queryKey: ["admin", "overview", "system"],
+    queryFn: () => api.get<SystemHealthResponse>("/admin/system-health"),
+    refetchInterval: 30_000,
+  });
+  const agents = useQuery({
+    queryKey: ["admin", "overview", "agents"],
+    queryFn: () => api.get<AgentMetricsResponse>("/admin/agents/metrics"),
+    refetchInterval: 30_000,
+  });
+  const errors = useQuery({
+    queryKey: ["admin", "overview", "errors"],
+    queryFn: () => api.get<ErrorsResponse>("/admin/errors"),
+    refetchInterval: 60_000,
   });
 
-  const { refetch } = overview;
+  const bounds = useMemo(() => {
+    const now = new Date().getTime();
+    return {
+      now: new Date(now).toISOString(),
+      d30: new Date(now - 30 * DAY).toISOString(),
+      thisFrom: startOfMonth(0).toISOString(),
+      lastFrom: startOfMonth(-1).toISOString(),
+    };
+  }, []);
 
-  useEffect(() => {
-    const intervalId = window.setInterval(() => {
-      void refetch();
-    }, 30_000);
-
-    return () => window.clearInterval(intervalId);
-  }, [refetch]);
+  const funnel30 = useQuery({
+    queryKey: ["admin", "overview", "funnel", "30d"],
+    queryFn: () =>
+      api.get<FunnelResponse>(
+        `/admin/onboarding/funnel?from=${encodeURIComponent(bounds.d30)}&to=${encodeURIComponent(bounds.now)}`,
+      ),
+  });
+  const funnelThisMonth = useQuery({
+    queryKey: ["admin", "overview", "funnel", "this-month"],
+    queryFn: () =>
+      api.get<FunnelResponse>(
+        `/admin/onboarding/funnel?from=${encodeURIComponent(bounds.thisFrom)}&to=${encodeURIComponent(bounds.now)}`,
+      ),
+  });
+  const funnelLastMonth = useQuery({
+    queryKey: ["admin", "overview", "funnel", "last-month"],
+    queryFn: () =>
+      api.get<FunnelResponse>(
+        `/admin/onboarding/funnel?from=${encodeURIComponent(bounds.lastFrom)}&to=${encodeURIComponent(bounds.thisFrom)}`,
+      ),
+  });
 
   const data = overview.data;
-  const healthStatus = systemStatus(data?.systemHealth);
+  const refreshAll = () => {
+    void overview.refetch();
+    void running.refetch();
+    void system.refetch();
+    void agents.refetch();
+    void errors.refetch();
+    void funnel30.refetch();
+  };
+
+  if (overview.isLoading || !data) {
+    return (
+      <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <LoadingOverview />
+      </div>
+    );
+  }
+
+  const newThisMonth = funnelThisMonth.data?.steps?.[0]?.count ?? null;
+  const newLastMonth = funnelLastMonth.data?.steps?.[0]?.count ?? null;
+  const signupDelta = percentDelta(newThisMonth, newLastMonth);
+  const deploysThisWeek = sumLastDays(data.deploys30d, 7);
+  const deploysLastWeek = sumLastDays(data.deploys30d, 7, 7);
+  const deployWeekDelta = percentDelta(deploysThisWeek, deploysLastWeek);
+  const successDelta = data.deploySuccessRate7d - data.deploySuccessRate24h;
+
+  const allHealthy =
+    data.systemHealth.api === "ok" && data.systemHealth.db === "ok" && data.systemHealth.redis === "ok";
+
+  const kpis: Stat[] = [
+    {
+      icon: RiCoinsFill,
+      label: "Monthly revenue",
+      value: formatMoney(data.revenue.mrr, data.revenue.currency),
+      delta: "—",
+      deltaColor: "neutral",
+      tone: "orange",
+      caption: `${formatNumber(data.totals.activeSubscriptions)} active subscriptions`,
+      hint: "Monthly recurring revenue: the sum of every active or trialing plan price.",
+    },
+    {
+      icon: RiGroupLine,
+      label: "Total users",
+      value: formatNumber(data.totals.users),
+      ...deltaPill(signupDelta),
+      tone: "blue",
+      caption: newThisMonth !== null ? `${formatNumber(newThisMonth)} joined this month` : "vs last month",
+      hint: "All registered users. The change compares this month's signups with last month's.",
+    },
+    {
+      icon: RiRocketLine,
+      label: "Deploys this week",
+      value: formatNumber(deploysThisWeek),
+      ...deltaPill(deployWeekDelta),
+      tone: "sky",
+      caption: `${formatNumber(data.totals.apps)} ${data.totals.apps === 1 ? "app" : "apps"} live`,
+      hint: "Deploys in the last 7 days compared with the 7 days before.",
+    },
+    {
+      icon: RiCheckboxCircleLine,
+      label: "Deploy success, 7 days",
+      value: `${data.deploySuccessRate7d}%`,
+      delta: successDelta === 0 ? "—" : `${Math.abs(Math.round(successDelta * 10) / 10)}%`,
+      deltaColor: successDelta === 0 ? "neutral" : successDelta >= 0 ? "lime" : "rose",
+      tone: "emerald",
+      caption: `${data.deploySuccessRate24h}% in the last 24h`,
+      hint: "Share of deploys that succeeded. The change shows how the last 24 hours compare with the 7-day rate.",
+    },
+  ];
 
   return (
     <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-      <div>
-        <p className="dashboard-section-label">Super Admin</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Overview cockpit</h1>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-caption-1-semibold uppercase tracking-[0.14em] text-text-tertiary">Super Admin</p>
+          <h1 className="mt-1 text-title-1-medium text-text-primary">Overview</h1>
+        </div>
+        <div className="flex items-center gap-2">
+          <StatusBadge status={allHealthy ? "ok" : "error"} label={allHealthy ? "All systems healthy" : "Degraded"} />
+          <RefreshButton onClick={refreshAll} isRefreshing={overview.isFetching} />
+        </div>
       </div>
 
-      {overview.isLoading || !data ? (
-        <LoadingGrid />
-      ) : (
-        <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Total Users" value={data.totals.users} icon={Users} status="info" />
-            <StatCard label="New Today" value={data.newUsersToday} icon={UserPlus} trend={{ value: data.newUsersToday, direction: "up" }} status="ok" />
-            <StatCard label="Active 7d" value={data.activeUsers7d} icon={Activity} status="info" />
-            <StatCard label="Organizations" value={data.totalOrgs} icon={Building2} status="info" />
-            <StatCard label="Connected Agents" value={data.connectedAgents} icon={Server} status="ok" />
-            <StatCard label="Disconnected Agents" value={data.disconnectedAgents} icon={Server} status={data.disconnectedAgents > 0 ? "error" : "ok"} />
-            <StatCard label="Apps" value={data.totals.apps} icon={AppWindow} status="info" />
-            <StatCard label="Deploy Rate 24h" value={`${data.deploySuccessRate24h}%`} icon={TrendingUp} status={data.deploySuccessRate24h >= 90 ? "ok" : "warning"} />
-            <StatCard label="Queue Wait Avg" value={formatMs(data.queueWaitAvg)} icon={Clock3} status={data.queueWaitAvg > 10_000 ? "warning" : "ok"} description={`p95 ${formatMs(data.queueWaitP95)}`} />
-            <StatCard label="Workers" value={data.workerCountExpected} icon={Workflow} status="info" description="Expected capacity (live count not exposed by the API)" />
-            <StatCard label="System Health" value={healthStatus === "ok" ? "OK" : "Check"} icon={ShieldCheck} status={healthStatus === "ok" ? "ok" : "error"} description={`${data.systemHealth.api}/${data.systemHealth.db}/${data.systemHealth.redis}`} />
-            <StatCard label="Deploy Rate 7d" value={`${data.deploySuccessRate7d}%`} icon={Gauge} status={data.deploySuccessRate7d >= 90 ? "ok" : "warning"} />
-          </div>
+      <LiveStrip data={data} running={running.data} system={system.data} agents={agents.data} />
 
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.4fr)_minmax(360px,0.8fr)]">
-            <Card className="rounded-lg">
-              <CardHeader className="flex flex-row items-center justify-between border-b border-border/80">
-                <CardTitle>Deploy Volume</CardTitle>
-                <StatusBadge status={healthStatus} label={healthStatus === "ok" ? "Healthy" : "Degraded"} />
-              </CardHeader>
-              <CardContent>
-                <DeployVolumeChart data={data.deploys30d} />
-              </CardContent>
-            </Card>
-            <div className="grid gap-6">
-              <RecentDeployments deployments={data.recentDeployments} />
-              <RecentSignups signups={data.recentSignups} />
-            </div>
-          </div>
-        </>
-      )}
+      <StatCards variant="footer" stats={kpis} />
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
+        <DeployChart data={data.deploys30d} />
+        <FunnelCard funnel={funnel30.data} isLoading={funnel30.isLoading} />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        <FailuresCard errors={errors.data} isLoading={errors.isLoading} />
+        <FleetCard agents={agents.data} isLoading={agents.isLoading} />
+        <PlatformHealthCard system={system.data} fallback={data.systemHealth} isLoading={system.isLoading} />
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+        <LiveDeploys running={running.data} />
+        <RecentDeploys deployments={data.recentDeployments} />
+        <RecentSignups signups={data.recentSignups} />
+      </div>
+
+      <p className="text-caption-1-regular text-text-tertiary">
+        Live numbers refresh every 10 to 60 seconds. Signup steps come from the onboarding funnel.
+      </p>
     </div>
   );
 }

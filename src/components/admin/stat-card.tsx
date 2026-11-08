@@ -1,29 +1,42 @@
-import type { LucideIcon } from "lucide-react";
-import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+"use client";
 
-import { Card, CardContent } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import type { ComponentType } from "react";
+import { RiArrowRightDownLine, RiArrowRightUpLine } from "@remixicon/react";
+
+import { Chip } from "@/components/base/badges/chip";
+import { cx } from "@/utils/cx";
+
+type IconComponent = ComponentType<{
+  className?: string;
+  "aria-hidden"?: boolean | "true" | "false";
+}>;
+
+export type StatCardStatus = "ok" | "warning" | "error" | "info";
 
 interface StatCardProps {
   label: string;
   value: string | number;
-  icon: LucideIcon;
+  icon: IconComponent;
+  /** Percentage change chip; direction picks the glyph and color. */
   trend?: { value: number; direction: "up" | "down" };
-  status?: "ok" | "warning" | "error" | "info";
-  /**
-   * Violet secondary-accent treatment (doc 02 §3.2) for a metric that's
-   * genuinely a trend/insight number with no real ok/warning/error meaning —
-   * never a substitute for a real status. `status` is ignored when set.
-   */
+  status?: StatCardStatus;
+  /** Tints the icon tile for metrics whose meaning is status-like. */
   accent?: "violet";
   description?: string;
+  className?: string;
+  id?: string;
 }
 
-const statusBorder: Record<NonNullable<StatCardProps["status"]>, string> = {
-  ok: "border-l-success",
-  warning: "border-l-warning",
-  error: "border-l-danger",
-  info: "border-l-info",
+/**
+ * Icon-tile tints per status. Neutral metrics (info) keep the standard
+ * BoardUI stat-card tile; ok/warning/error use the shared status palette.
+ */
+const STATUS_TILE: Record<StatCardStatus | "violet", string> = {
+  info: "bg-stat-card-icon-background text-foreground-icon-primary",
+  ok: "bg-status-lime-background text-status-lime-text",
+  warning: "bg-status-orange-background text-status-orange-text",
+  error: "bg-status-rose-background text-status-rose-text",
+  violet: "bg-stat-card-icon-background text-foreground-icon-primary",
 };
 
 export function StatCard({
@@ -34,48 +47,45 @@ export function StatCard({
   status = "info",
   accent,
   description,
+  className,
+  id,
 }: StatCardProps) {
-  const TrendIcon = trend?.direction === "down" ? ArrowDownRight : ArrowUpRight;
+  const tile = STATUS_TILE[accent ?? status];
 
   return (
-    <Card
-      className={cn(
-        "hover-lift group overflow-hidden rounded-lg border-l-4 py-0",
-        accent === "violet" ? "border-l-accent-2" : statusBorder[status]
+    <section
+      id={id}
+      className={cx(
+        "flex min-w-0 flex-col items-start justify-between gap-3 rounded-2xl bg-background-secondary-default p-4 transition-[box-shadow] duration-200",
+        className,
       )}
     >
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div
-            className={cn(
-              "flex size-10 items-center justify-center rounded-md border border-border/80",
-              accent === "violet" ? "bg-accent-2-muted text-accent-2" : "bg-secondary/40 text-muted-foreground"
-            )}
-          >
-            <Icon className="size-5" />
-          </div>
+      <span className={cx("flex items-center rounded-md p-1.5", tile)}>
+        <Icon className="size-5 shrink-0" aria-hidden />
+      </span>
+      <div className="flex w-full min-w-0 flex-col gap-0.5">
+        <p className="w-full truncate text-body-medium text-text-secondary">{label}</p>
+        <div className="flex w-full flex-wrap items-center gap-2">
+          <p className="whitespace-nowrap text-title-1-medium tabular-nums text-text-primary">
+            {value}
+          </p>
           {trend ? (
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium",
-                trend.direction === "up"
-                  ? "bg-success-muted text-success-text"
-                  : "bg-danger-muted text-danger-text"
-              )}
-            >
-              <TrendIcon className="size-3.5" />
-              {Math.abs(trend.value)}%
-            </span>
+            <Chip variant="bold" color={trend.direction === "up" ? "lime" : "rose"}>
+              <span className="inline-flex items-center gap-0.5">
+                {trend.direction === "up" ? (
+                  <RiArrowRightUpLine className="size-3.5" aria-hidden />
+                ) : (
+                  <RiArrowRightDownLine className="size-3.5" aria-hidden />
+                )}
+                {Math.abs(trend.value)}%
+              </span>
+            </Chip>
           ) : null}
         </div>
-        <div className="mt-6">
-          <p className="text-3xl font-bold tracking-tight text-foreground">{value}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{label}</p>
-          {description ? (
-            <p className="mt-3 text-xs leading-5 text-muted-foreground">{description}</p>
-          ) : null}
-        </div>
-      </CardContent>
-    </Card>
+        {description ? (
+          <p className="text-caption-1-regular text-text-tertiary">{description}</p>
+        ) : null}
+      </div>
+    </section>
   );
 }

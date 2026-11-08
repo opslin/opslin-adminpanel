@@ -1,8 +1,8 @@
 :root {
   color-scheme: light;
 
-  --font-sans-ui: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono-ui: var(--font-geist-mono), "SF Mono", Menlo, Consolas, monospace;
+  --font-sans-ui: var(--font-inter), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono-ui: var(--font-mono-source), "SF Mono", Menlo, Consolas, monospace;
 
   --opslin-bg-canvas: #f3f6f2;
   --opslin-bg-primary: #ffffff;

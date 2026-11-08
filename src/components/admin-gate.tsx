@@ -2,9 +2,12 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Shield } from "lucide-react";
+import { RiShieldUserLine } from "@remixicon/react";
+
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
+import { Button } from "@/components/base/buttons/button";
+import { Spinner } from "@/components/base/spinner/spinner";
 import { useAuth } from "@/hooks/use-auth";
 
 const DASHBOARD_URL = process.env.NEXT_PUBLIC_DASHBOARD_URL ?? "http://localhost:3000";
@@ -27,8 +30,8 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <div className="size-9 animate-spin rounded-full border-4 border-border border-t-primary" />
+      <div className="flex h-screen items-center justify-center bg-background-full">
+        <Spinner size="lg" />
       </div>
     );
   }
@@ -39,31 +42,29 @@ export function AdminGate({ children }: { children: React.ReactNode }) {
 
   if (!user.isPlatformAdmin) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background text-foreground">
-        <Shield className="h-14 w-14 text-muted-foreground" />
-        <h1 className="text-xl font-semibold">Platform admin access required</h1>
-        <p className="text-sm text-muted-foreground">
+      <div className="flex h-screen flex-col items-center justify-center gap-4 bg-background-full">
+        <RiShieldUserLine className="size-14 text-foreground-icon-quaternary" aria-hidden />
+        <h1 className="text-title-2-medium text-text-primary">Platform admin access required</h1>
+        <p className="text-body-regular text-text-secondary">
           Your account does not have Super Admin privileges.
         </p>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          className="mt-2"
           onClick={() => { window.location.href = `${DASHBOARD_URL}/apps`; }}
-          className="mt-2 rounded-md border border-border px-4 py-2 text-sm hover:bg-accent"
         >
           Back to Dashboard
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="flex min-h-screen flex-col bg-background-full">
       <AdminTopbar user={user} />
-      <div className="flex min-h-[calc(100vh-3.5rem)]">
-        <AdminSidebar className="sticky top-14 hidden h-[calc(100vh-3.5rem)] lg:flex" />
-        <main className="min-w-0 flex-1 bg-background">
-          {children}
-        </main>
+      <div className="flex min-h-[calc(100vh-3.5rem)] gap-3 p-3">
+        <AdminSidebar className="sticky top-[3.75rem] hidden h-[calc(100vh-4.25rem)] lg:flex" />
+        <main className="min-w-0 flex-1">{children}</main>
       </div>
     </div>
   );

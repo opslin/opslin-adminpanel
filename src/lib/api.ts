@@ -252,6 +252,25 @@ class ApiClient {
         return this.get<AiConfigStatus>("/admin/ai-config/");
     }
 
+    // One saved connection per provider, the switch between them, and the thinking-effort level of the active one.
+    async getSavedAiProviders() {
+        return this.get<{ providers: AiSavedProvider[] }>("/admin/ai-config/saved");
+    }
+
+    async activateAiProvider(provider: AiConfigProvider) {
+        return this.post<AiConfigStatus>("/admin/ai-config/activate", { provider });
+    }
+
+    // The effort levels, default and listed price of one model, read from OpenRouter's model list.
+    async getAiModelInfo(provider: AiConfigProvider, model: string, baseUrl?: string) {
+        const query = new URLSearchParams({ provider, model, ...(baseUrl ? { baseUrl } : {}) });
+        return this.get<AiModelInfo>(`/admin/ai-config/model-info?${query.toString()}`);
+    }
+
+    async setAiEffort(reasoningEffort: string | null) {
+        return this.patch<AiConfigStatus>("/admin/ai-config/effort", { reasoningEffort });
+    }
+
     // Deploy Intelligence Layer (Phase 24) — per-model pricing (for cost
     // display only, not a credential — no live re-verification) and the
     // token/cost usage aggregation the founder uses to see spend per stage,
@@ -264,8 +283,27 @@ class ApiClient {
         return this.get<AiUsageSummary>(`/admin/ai-config/usage?rangeDays=${rangeDays}`);
     }
 
-    async getAiDeployCosts(rangeDays = 30) {
-        return this.get<AiDeployCosts>(`/admin/ai-config/usage/deploys?rangeDays=${rangeDays}`);
+    async getAiDeployCosts(filters: AiDeployCostFilters = {}) {
+        const query = new URLSearchParams({ rangeDays: String(filters.rangeDays ?? 30) });
+        if (filters.model) query.set("model", filters.model);
+        if (filters.effort) query.set("effort", filters.effort);
+        if (filters.status) query.set("status", filters.status);
+        return this.get<AiDeployCosts>(`/admin/ai-config/usage/deploys?${query.toString()}`);
+    }
+
+    // Today's USD to INR rate, offered as a suggestion; the report converts at the rate you save.
+    async getAiFxRate() {
+        return this.get<{ available: boolean; rate?: number; asOf?: string | null; source?: string }>("/admin/ai-config/fx");
+    }
+
+    // The Test button on a saved provider: a real call with the stored key, now.
+    async checkAiProvider(provider: AiConfigProvider) {
+        return this.post<{ check: AiProviderCheck; provider: AiSavedProvider }>("/admin/ai-config/check", { provider });
+    }
+
+    // Change the model of a saved provider; the stored key is reused and the new model is tested before it is saved.
+    async changeAiModel(provider: AiConfigProvider, model: string) {
+        return this.patch<{ check: AiProviderCheck; effortReset: boolean; provider: AiSavedProvider }>("/admin/ai-config/model", { provider, model });
     }
 
     async getAiUsageEvents(query: { limit?: number; cursor?: string } = {}) {
@@ -2317,6 +2355,8 @@ export interface AiConfigInput {
     model: string;
     apiKey: string;
     baseUrl?: string;
+    // Omitted keeps this provider's previous level; null means the provider's own default.
+    reasoningEffort?: string | null;
 }
 
 export interface AiConfigStatus {
@@ -2324,6 +2364,18 @@ export interface AiConfigStatus {
     provider?: AiConfigProvider;
     model?: string;
     baseUrl?: string | null;
+    reasoningEffort?: string | null;
+    availableEfforts?: string[];
+    // The model's own default level (what "Provider default" means for it); null when the catalog does not know it.
+    defaultEffort?: string | null;
+    // What runs when no effort is chosen: "opslin" = OpenRouter, where Opslin's own deploy steps ask for the level in
+    // automaticEffort (Low); "model_default" = Anthropic, nothing is sent and the model's own default applies.
+    automaticSource?: "opslin" | "model_default";
+    automaticEffort?: string | null;
+    // The last four characters of the saved key behind a mask, never the key; null when it cannot be read.
+    keyHint?: string | null;
+    // The last Test of this connection; null if it was never tested.
+    lastCheck?: { at: string; ok: boolean; message: string | null } | null;
     lastVerifiedAt?: string | null;
     updatedAt?: string;
     // DIL Phase 24 — null/unset shows as "cost unknown" rather than a
@@ -2331,6 +2383,34 @@ export interface AiConfigStatus {
     inputCostPerMillionUsd?: number | null;
     outputCostPerMillionUsd?: number | null;
     usdToInrRate?: number | null;
+}
+
+export interface AiProviderCheck {
+    success: boolean;
+    message: string | null;
+    latencyMs: number;
+    costUsd?: number;
+    // The model the provider says answered, and whether that is the one asked for (null: it did not say).
+    answeredModel?: string;
+    modelMatches?: boolean | null;
+    inputTokens?: number;
+    outputTokens?: number;
+    // Tokens spent on hidden thinking (OpenRouter reports it); shows what the effort level did.
+    reasoningTokens?: number;
+}
+
+export interface AiModelInfo {
+    known: boolean;
+    availableEfforts: string[];
+    defaultEffort: string | null;
+    inputPerMillionUsd: number | null;
+    outputPerMillionUsd: number | null;
+}
+
+export interface AiSavedProvider extends AiConfigStatus {
+    provider: AiConfigProvider;
+    active: boolean;
+    availableEfforts: string[];
 }
 
 // Deploy Intelligence Layer (Phase 24) — token/cost usage tracking
@@ -2382,6 +2462,17 @@ export interface AiUsageSummary {
     byDay: AiUsageByDay[];
 }
 
+export interface AiDeployCostFilters {
+    rangeDays?: number;
+    model?: string;
+    effort?: string;
+    status?: "COMPLETED" | "FAILED";
+}
+
+// How a cost was arrived at: "provider" the provider reported it for the call; "tokens" exact tokens times a published or
+// set price (exact for Anthropic); "estimated" tokens times the lowest price OpenRouter lists; "mixed" more than one.
+export type AiCostBasis = "provider" | "tokens" | "estimated" | "mixed";
+
 export interface AiDeployCostRow {
     jobId: string;
     repo: string | null;
@@ -2391,25 +2482,58 @@ export interface AiDeployCostRow {
     inputTokens: number;
     outputTokens: number;
     models: string[];
+    efforts: string[];
     byStage: Array<{ stage: string; calls: number }>;
     costUsd: number | null;
     costInr: number | null;
+    costBasis: AiCostBasis | null;
+    averageCallSeconds: number | null;
     at: string;
+}
+
+export interface AiModelCostRow {
+    model: string;
+    provider: string;
+    deploys: number;
+    passed: number;
+    failed: number;
+    calls: number;
+    averageCallsPerDeploy: number;
+    averageInputTokensPerDeploy: number;
+    averageOutputTokensPerDeploy: number;
+    totalCostUsd: number | null;
+    averageCostUsdPerDeploy: number | null;
+    averageCostInrPerDeploy: number | null;
+    costBasis: AiCostBasis | null;
+    averageCallSeconds: number | null;
+    efforts: string[];
 }
 
 export interface AiDeployCosts {
     rangeDays: number;
     usdToInrRate: number | null;
+    filters: { models: Array<{ model: string; provider: string; deploys: number }>; efforts: string[] };
     summary: {
         deploys: number;
+        passed: number;
+        failed: number;
+        successRate: number | null;
         unpricedDeploys: number;
+        exactCostDeploys: number;
+        estimatedCostDeploys: number;
         totalCostUsd: number | null;
         averageCostUsdPerDeploy: number | null;
         totalInputTokens: number;
         totalOutputTokens: number;
+        averageInputTokensPerDeploy: number | null;
+        averageOutputTokensPerDeploy: number | null;
+        averageCallsPerDeploy: number | null;
+        averageDurationSeconds: number | null;
+        averageCallSeconds: number | null;
         callsWithoutDeploy: number;
     };
-    prices: Array<{ model: string; inputPerMillionUsd: number | null; outputPerMillionUsd: number | null; source: "published" | "admin" | null }>;
+    byModel: AiModelCostRow[];
+    prices: Array<{ model: string; inputPerMillionUsd: number | null; outputPerMillionUsd: number | null; source: "published" | "admin" | "openrouter" | null }>;
     deploys: AiDeployCostRow[];
 }
 

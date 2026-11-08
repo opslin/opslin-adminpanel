@@ -1,9 +1,9 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
+import { RiRefreshLine } from "@remixicon/react";
 
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/base/buttons/button";
+import { cx } from "@/utils/cx";
 
 interface RefreshButtonProps {
   id?: string;
@@ -24,14 +24,14 @@ export function RefreshButton({
     <Button
       id={id}
       type="button"
-      variant="outline"
-      size="sm"
+      variant="secondary"
+      size="small"
       disabled={isRefreshing}
       aria-label={label}
       onClick={onClick}
-      className={cn("h-9", className)}
+      className={cx(className, isRefreshing && "[&_svg]:animate-spin")}
+      leadingIcon={RiRefreshLine}
     >
-      <RefreshCw className={cn("size-4", isRefreshing && "animate-spin")} />
       <span className="hidden sm:inline">{isRefreshing ? "Refreshing" : label}</span>
     </Button>
   );

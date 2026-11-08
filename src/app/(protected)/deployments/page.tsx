@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
-import { AlertTriangle, Clock3, Gauge, Rocket, Timer, TrendingUp } from "lucide-react";
+import { AlertTriangle, Clock3, Download, Gauge, Rocket, ScrollText, Timer, TrendingUp } from "lucide-react";
 
 import { DataTable } from "@/components/admin/data-table";
 import { DateRangePicker, type AdminDateRange } from "@/components/admin/date-range-picker";
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { api } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/utils";
+import { downloadJournal, runKeyOfDeployment } from "@/lib/journal-download";
 
 const LazyEnhancedLogViewer = lazy(() =>
   import("@/components/logs/enhanced-log-viewer").then((module) => ({
@@ -148,6 +150,8 @@ function DeploymentDrawer({
         </CardContent>
       </Card>
 
+      <JournalDownloadRow deploymentId={deployment.id} />
+
       <div className="flex items-center gap-2">
         <Button type="button" variant="outline" onClick={onLoadLogs} disabled={logs.isFetching}>
           {logs.isFetching ? "Loading logs..." : "View Logs"}
@@ -167,6 +171,32 @@ function DeploymentDrawer({
           />
         </Suspense>
       ) : null}
+    </div>
+  );
+}
+
+function JournalDownloadRow({ deploymentId }: { deploymentId: string }) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  async function download(kind?: string) {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const runKey = await runKeyOfDeployment(deploymentId);
+      if (!runKey) { setMessage("This deployment is not in the journal (it ran before the journal existed)."); return; }
+      const count = await downloadJournal({ runKeys: [runKey], kind });
+      setMessage(`Downloaded ${count} journal event${count === 1 ? "" : "s"}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "The download failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void download()}><Download className="mr-2 size-4" />Download this deployment&apos;s data</Button>
+      <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void download("ai_call")}>AI calls only</Button>
+      {message ? <span className="text-sm text-muted-foreground" role="status">{message}</span> : null}
     </div>
   );
 }
@@ -257,9 +287,14 @@ export default function AdminDeploymentsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-[96rem] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-      <div>
-        <p className="dashboard-section-label">P0 Deployments</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">Deployment operations</h1>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="dashboard-section-label">P0 Deployments</p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight">Deployment operations</h1>
+        </div>
+        <Button asChild variant="outline">
+          <Link href="/deploy-journal"><ScrollText className="mr-2 size-4" />Deploy journal (every run, AI calls, deleted apps)</Link>
+        </Button>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">

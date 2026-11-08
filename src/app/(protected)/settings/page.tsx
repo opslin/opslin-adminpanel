@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
@@ -18,6 +18,8 @@ import {
 import { toast } from "sonner";
 
 import { AiDeployCostCard } from "@/components/admin/ai-deploy-cost-card";
+import { AiProviderSwitch } from "@/components/admin/ai-provider-switch";
+import { MODEL_QUICK_PICKS } from "@/lib/ai-models";
 import { DataTable } from "@/components/admin/data-table";
 import { EmptyState } from "@/components/admin/empty-state";
 import { StatusBadge } from "@/components/admin/status-badge";
@@ -284,15 +286,30 @@ function AgentReleaseStorageCard() {
 
 const aiProviderOptions: { value: AiConfigProvider; label: string; needsBaseUrl: boolean }[] = [
   { value: "anthropic", label: "Anthropic", needsBaseUrl: false },
-  { value: "openai_compatible", label: "OpenAI-compatible (OpenAI, OpenRouter, self-hosted)", needsBaseUrl: true },
+  { value: "openai_compatible", label: "OpenRouter / OpenAI-compatible", needsBaseUrl: true },
 ];
 
 // Session recommendation, not a mandate — see docs/audit/22 canon doc. The
 // founder can change provider/model here at any time; nothing in DIL's code
 // requires a redeploy to switch.
 const DEFAULT_MODEL_BY_PROVIDER: Record<AiConfigProvider, string> = {
-  anthropic: "claude-sonnet-5",
-  openai_compatible: "",
+  anthropic: "claude-sonnet-5-5",
+  openai_compatible: "z-ai/glm-5.3-flash",
+};
+const EFFORT_NAME: Record<string, string> = { low: "Low", medium: "Medium", high: "High", xhigh: "Extra high", max: "Max" };
+
+function useDebounced<T>(value: T, ms: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), ms);
+    return () => clearTimeout(timer);
+  }, [value, ms]);
+  return debounced;
+}
+
+const DEFAULT_BASE_URL_BY_PROVIDER: Record<AiConfigProvider, string> = {
+  anthropic: "",
+  openai_compatible: "https://openrouter.ai/api/v1",
 };
 
 function AiConfigCard() {
@@ -301,9 +318,22 @@ function AiConfigCard() {
   const [model, setModel] = useState(DEFAULT_MODEL_BY_PROVIDER.anthropic);
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [formEffort, setFormEffort] = useState("keep");
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const providerMeta = aiProviderOptions.find((option) => option.value === provider) || aiProviderOptions[0];
+
+  // The effort levels belong to the typed model, so they are read from the catalog after the typing pauses.
+  const modelToLookUp = useDebounced(model.trim(), 400);
+  const urlToLookUp = useDebounced(baseUrl.trim(), 400);
+  const { data: modelInfo } = useQuery({
+    queryKey: ["admin", "aiModelInfo", provider, modelToLookUp, urlToLookUp],
+    queryFn: () => api.getAiModelInfo(provider, modelToLookUp, providerMeta.needsBaseUrl ? urlToLookUp || undefined : undefined),
+    enabled: modelToLookUp.length > 0,
+  });
+  const effortLevels = modelInfo?.availableEfforts ?? (provider === "anthropic" ? ["low", "medium", "high", "xhigh", "max"] : ["low", "medium", "high", "xhigh"]);
+  // A level chosen for one model may not exist on the next one the admin picks.
+  const chosenEffort = formEffort === "keep" || formEffort === "default" || effortLevels.includes(formEffort) ? formEffort : "keep";
 
   const { data: status, isLoading } = useQuery({
     queryKey: ["admin", "aiConfig"],
@@ -315,6 +345,7 @@ function AiConfigCard() {
     model: model.trim(),
     apiKey,
     baseUrl: providerMeta.needsBaseUrl ? baseUrl.trim() || undefined : undefined,
+    ...(chosenEffort === "keep" ? {} : { reasoningEffort: chosenEffort === "default" ? null : chosenEffort }),
   });
 
   function invalidatePriorTest() {
@@ -345,6 +376,7 @@ function AiConfigCard() {
       setApiKey("");
       setTestResult(null);
       queryClient.invalidateQueries({ queryKey: ["admin", "aiConfig"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "aiSaved"] });
     },
     onError: (error) => {
       toast.error(error instanceof Error ? error.message : "Unable to save AI provider config");
@@ -365,8 +397,8 @@ function AiConfigCard() {
             Deploy Intelligence — AI provider
           </CardTitle>
           {!isLoading && (
-            <Badge variant={status?.configured ? "default" : "secondary"}>
-              {status?.configured ? "Configured" : "Not configured"}
+            <Badge variant={status?.configured ? "default" : "secondary"} className="font-mono">
+              {status?.configured ? `Key ${status.keyHint ?? "attached"}` : "No API key"}
             </Badge>
           )}
         </div>
@@ -378,7 +410,7 @@ function AiConfigCard() {
         </p>
 
         {status?.configured && (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-xl border border-border/70 bg-secondary/30 p-3">
               <p className="text-xs font-medium uppercase text-muted-foreground">Provider</p>
               <p className="mt-1 font-medium text-foreground">
@@ -389,9 +421,16 @@ function AiConfigCard() {
               <p className="text-xs font-medium uppercase text-muted-foreground">Model</p>
               <p className="mt-1 truncate font-medium text-foreground">{status.model}</p>
             </div>
+            <div className="rounded-xl border border-border/70 bg-secondary/30 p-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">API key</p>
+              <p className="mt-1 truncate font-mono font-medium text-foreground">{status.keyHint ?? "Not readable"}</p>
+            </div>
           </div>
         )}
 
+        <AiProviderSwitch />
+
+        <p className="text-sm font-medium">Save or update a provider</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Provider</Label>
@@ -401,6 +440,8 @@ function AiConfigCard() {
                 const nextProvider = value as AiConfigProvider;
                 setProvider(nextProvider);
                 setModel(DEFAULT_MODEL_BY_PROVIDER[nextProvider]);
+                setBaseUrl(DEFAULT_BASE_URL_BY_PROVIDER[nextProvider]);
+                setFormEffort("keep");
                 invalidatePriorTest();
               }}
             >
@@ -422,8 +463,22 @@ function AiConfigCard() {
               id="ai-config-model"
               value={model}
               onChange={(event) => { setModel(event.target.value); invalidatePriorTest(); }}
-              placeholder="claude-sonnet-5"
+              placeholder="claude-sonnet-5-5"
             />
+            <div className="flex flex-wrap gap-1.5">
+              {MODEL_QUICK_PICKS[provider].map((pick) => (
+                <Button
+                  key={pick.id}
+                  type="button"
+                  size="sm"
+                  variant={model.trim() === pick.id ? "secondary" : "outline"}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => { setModel(pick.id); setFormEffort("keep"); invalidatePriorTest(); }}
+                >
+                  {pick.label}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -438,6 +493,32 @@ function AiConfigCard() {
             />
           </div>
         )}
+
+        <div className="space-y-2">
+          <Label>Thinking effort</Label>
+          <Select value={chosenEffort} onValueChange={(value) => { setFormEffort(value); invalidatePriorTest(); }}>
+            <SelectTrigger className="h-9 w-full border-border/60 bg-background sm:w-64">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="keep">Keep the saved level</SelectItem>
+              <SelectItem value="default">
+                {provider === "openai_compatible" ? "Automatic (Low for deploys)" : `Model default${modelInfo?.defaultEffort ? ` (${EFFORT_NAME[modelInfo.defaultEffort] ?? modelInfo.defaultEffort})` : ""}`}
+              </SelectItem>
+              {effortLevels.map((level) => (
+                <SelectItem key={level} value={level}>{EFFORT_NAME[level] ?? level}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {modelInfo?.known
+              ? `Levels ${model.trim()} supports, from OpenRouter's model list.`
+              : "This model is not in OpenRouter's list, so the common levels are shown. The provider refuses a level it does not accept."}
+            {modelInfo?.known && modelInfo.inputPerMillionUsd !== null && modelInfo.outputPerMillionUsd !== null
+              ? ` Listed price: $${modelInfo.inputPerMillionUsd} in / $${modelInfo.outputPerMillionUsd} out per million tokens (enter it under Pricing after saving).`
+              : ""}
+          </p>
+        </div>
 
         <div className="space-y-2">
           <Label htmlFor="ai-config-api-key">API key</Label>
@@ -500,7 +581,6 @@ function AiPricingForm({ status }: { status: { inputCostPerMillionUsd?: number |
   const queryClient = useQueryClient();
   const [inputCost, setInputCost] = useState(status.inputCostPerMillionUsd?.toString() ?? "");
   const [outputCost, setOutputCost] = useState(status.outputCostPerMillionUsd?.toString() ?? "");
-  const [inrRate, setInrRate] = useState(status.usdToInrRate?.toString() ?? "");
 
   const parseOrNull = (value: string): number | null | undefined => {
     if (value.trim() === "") return null;
@@ -513,7 +593,6 @@ function AiPricingForm({ status }: { status: { inputCostPerMillionUsd?: number |
       const input: AiPricingInput = {
         inputCostPerMillionUsd: parseOrNull(inputCost),
         outputCostPerMillionUsd: parseOrNull(outputCost),
-        usdToInrRate: parseOrNull(inrRate),
       };
       return api.saveAiPricing(input);
     },
@@ -527,7 +606,7 @@ function AiPricingForm({ status }: { status: { inputCostPerMillionUsd?: number |
     },
   });
 
-  const hasInvalidValue = [inputCost, outputCost, inrRate].some((value) => parseOrNull(value) === undefined);
+  const hasInvalidValue = [inputCost, outputCost].some((value) => parseOrNull(value) === undefined);
 
   return (
     <div className="space-y-3 rounded-xl border border-border/70 bg-secondary/20 p-4">
@@ -536,9 +615,9 @@ function AiPricingForm({ status }: { status: { inputCostPerMillionUsd?: number |
         <p className="text-sm font-medium">Pricing (for cost tracking)</p>
       </div>
       <p className="text-xs text-muted-foreground">
-        The model&apos;s published per-million-token price — used only to compute cost in the Usage &amp; cost section below. Leave blank to leave cost unknown.
+        The model&apos;s per-million-token price, for models without a published price. The rupee rate is set in Cost per deploy.
       </p>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="ai-pricing-input">Input $ / 1M tokens</Label>
           <Input id="ai-pricing-input" type="number" min="0" step="0.01" value={inputCost} onChange={(event) => setInputCost(event.target.value)} placeholder="0.20" />
@@ -546,10 +625,6 @@ function AiPricingForm({ status }: { status: { inputCostPerMillionUsd?: number |
         <div className="space-y-2">
           <Label htmlFor="ai-pricing-output">Output $ / 1M tokens</Label>
           <Input id="ai-pricing-output" type="number" min="0" step="0.01" value={outputCost} onChange={(event) => setOutputCost(event.target.value)} placeholder="0.80" />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="ai-pricing-inr">USD → INR rate</Label>
-          <Input id="ai-pricing-inr" type="number" min="0" step="0.01" value={inrRate} onChange={(event) => setInrRate(event.target.value)} placeholder="88" />
         </div>
       </div>
       <Button size="sm" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || hasInvalidValue}>

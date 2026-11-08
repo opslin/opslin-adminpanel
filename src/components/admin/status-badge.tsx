@@ -1,29 +1,16 @@
-import { cn } from "@/lib/utils";
+"use client";
+
+import { Chip, type ChipColor } from "@/components/base/badges/chip";
+import { cx } from "@/utils/cx";
 
 export type BadgeStatus = "ok" | "warning" | "error" | "info" | "offline";
 
-const statusStyles: Record<BadgeStatus, string> = {
-  ok: "border-success/25 bg-success-muted text-success-text",
-  warning: "border-warning/25 bg-warning-muted text-warning-text",
-  error: "border-danger/25 bg-danger-muted text-danger-text",
-  info: "border-info/25 bg-info-muted text-info-text",
-  offline: "border-muted-foreground/25 bg-secondary text-muted-foreground",
-};
-
-const dotStyles: Record<BadgeStatus, string> = {
-  ok: "bg-success",
-  warning: "bg-warning",
-  error: "bg-danger",
-  info: "bg-info",
-  offline: "bg-muted-foreground",
-};
-
-const statusLabels: Record<BadgeStatus, string> = {
-  ok: "Ok",
-  warning: "Warning",
-  error: "Error",
-  info: "Info",
-  offline: "Offline",
+const STATUS_CHIP: Record<BadgeStatus, { color: ChipColor; label: string; dot: string }> = {
+  ok: { color: "lime", label: "Ok", dot: "bg-status-lime-text" },
+  warning: { color: "yellow", label: "Warning", dot: "bg-status-yellow-text" },
+  error: { color: "rose", label: "Error", dot: "bg-status-rose-text" },
+  info: { color: "cyan", label: "Info", dot: "bg-status-cyan-text" },
+  offline: { color: "gray", label: "Offline", dot: "bg-foreground-icon-tertiary" },
 };
 
 export function StatusBadge({
@@ -35,16 +22,12 @@ export function StatusBadge({
   label?: string;
   className?: string;
 }) {
+  const chip = STATUS_CHIP[status];
+
   return (
-    <span
-      className={cn(
-        "inline-flex h-6 items-center gap-1.5 rounded-full border px-2 text-xs font-medium",
-        statusStyles[status],
-        className
-      )}
-    >
-      <span className={cn("size-1.5 rounded-full", dotStyles[status])} />
-      {label ?? statusLabels[status]}
-    </span>
+    <Chip variant="subtle" color={chip.color} className={cx("gap-1.5", className)}>
+      <span className={cx("size-1.5 rounded-full", chip.dot)} aria-hidden />
+      {label ?? chip.label}
+    </Chip>
   );
 }

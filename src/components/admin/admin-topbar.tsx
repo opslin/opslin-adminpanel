@@ -3,48 +3,40 @@
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { useQueryClient } from "@tanstack/react-query";
-import { LogOut, Menu, Search, Shield } from "lucide-react";
+import {
+  RiExternalLinkLine,
+  RiLogoutBoxRLine,
+  RiMenuLine,
+  RiSearchLine,
+  RiShieldUserLine,
+} from "@remixicon/react";
 
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { RefreshButton } from "@/components/admin/refresh-button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Avatar } from "@/components/base/avatar/avatar";
+import { Button } from "@/components/base/buttons/button";
+import { Chip } from "@/components/base/badges/chip";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Switch } from "@/components/ui/switch";
+  Dropdown,
+  DropdownDivider,
+  DropdownItem,
+  DropdownPopover,
+  DropdownTrigger,
+} from "@/components/base/dropdown/dropdown";
+import { Input } from "@/components/base/input/input";
+import { Switch } from "@/components/base/switch/switch";
+import { Drawer } from "@/components/base/drawer/drawer";
 import { api, type User } from "@/lib/api";
-import { cn, initialsFor } from "@/lib/utils";
+import { initialsFor } from "@/lib/utils";
 
 function EnvironmentBadge() {
   const env = process.env.NEXT_PUBLIC_APP_ENV?.toLowerCase();
   const isProduction = env === "production" || env === "prod";
 
   return (
-    <Badge
-      variant="outline"
-      className={cn(
-        "h-6 rounded-full px-2 text-[11px] font-medium",
-        isProduction
-          ? "border-danger/30 bg-danger-muted text-danger-text"
-          : "border-info/30 bg-info-muted text-info-text"
-      )}
-    >
+    <Chip variant="subtle" color={isProduction ? "rose" : "cyan"}>
       {isProduction ? "Production" : "Staging"}
-    </Badge>
+    </Chip>
   );
 }
 
@@ -78,33 +70,35 @@ export function AdminTopbar({ user }: { user: User }) {
   }, [autoRefresh, refreshAdminQueries]);
 
   return (
-    <header className="glass-panel backdrop-blur-md sticky top-0 z-40 h-14 rounded-none border-x-0 border-t-0">
+    <header className="sticky top-0 z-40 border-b border-separator-border bg-background-full">
       <div className="flex h-14 items-center gap-3 px-3 sm:px-4 lg:px-5">
         <Button
           id="admin-topbar-open-navigation"
-          type="button"
+          iconOnly
+          leadingIcon={RiMenuLine}
           variant="ghost"
-          size="icon-sm"
+          size="small"
           className="lg:hidden"
           aria-label="Open admin navigation"
           onClick={() => setMobileNavOpen(true)}
-        >
-          <Menu className="size-4" />
-        </Button>
+        />
 
         <div className="hidden items-center gap-3 sm:flex">
           <Image src="/logo/opslin-logo-white.png" alt="Opslin" width={161} height={50} className="h-7 w-auto" />
-          <p className="border-l border-border/80 pl-3 text-[11px] text-muted-foreground">Super Admin</p>
+          <p className="border-s border-separator-border ps-3 text-caption-1-medium text-text-tertiary">
+            Super Admin
+          </p>
         </div>
 
         <EnvironmentBadge />
 
-        <div className="relative hidden min-w-0 flex-1 md:block">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <div className="hidden min-w-0 flex-1 md:block">
           <Input
             id="admin-topbar-search"
+            aria-label="Search users, agents, deploys"
             placeholder="Search users, agents, deploys..."
-            className="h-9 max-w-xl border-border/80 bg-secondary/30 pl-9"
+            leadingIcon={RiSearchLine}
+            className="max-w-xl"
           />
         </div>
 
@@ -114,59 +108,91 @@ export function AdminTopbar({ user }: { user: User }) {
             onClick={() => void refreshAdminQueries()}
             isRefreshing={isRefreshing}
           />
-          <div className="hidden items-center gap-2 rounded-md border border-border/80 bg-secondary/30 px-2 py-1.5 lg:flex">
+          <div className="hidden items-center gap-2 rounded-xl border border-border-button-default bg-background-primary-default px-2 py-1.5 lg:flex">
             <Switch
               id="admin-topbar-auto-refresh"
-              checked={autoRefresh}
-              onCheckedChange={setAutoRefresh}
+              size="sm"
+              isSelected={autoRefresh}
+              onChange={setAutoRefresh}
+              aria-label="Auto refresh every 60 seconds"
             />
-            <label htmlFor="admin-topbar-auto-refresh" className="text-xs text-muted-foreground">
+            <label
+              htmlFor="admin-topbar-auto-refresh"
+              className="cursor-pointer text-caption-1-medium text-text-tertiary"
+            >
               60s auto
             </label>
           </div>
-          <Button id="admin-topbar-mobile-search" type="button" variant="ghost" size="icon-sm" className="md:hidden" aria-label="Search admin">
-            <Search className="size-4" />
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button id="admin-topbar-user-menu" variant="ghost" className="h-9 gap-2 rounded-full px-2">
-                <Avatar className="size-8 border border-border/80">
-                  <AvatarFallback>{initialsFor(user.name, user.email)}</AvatarFallback>
-                </Avatar>
-                <div className="hidden min-w-0 text-left sm:block">
-                  <p className="truncate text-sm font-medium">{user.name || "Operator"}</p>
-                  <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-                </div>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuLabel className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Shield className="size-4 text-primary" />
-                  <span>Platform admin</span>
-                </div>
-                <p className="truncate text-xs font-normal text-muted-foreground">{user.email}</p>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem id="admin-topbar-user-dashboard" onClick={() => { window.location.href = `${DASHBOARD_URL}/overview`; }}>User dashboard</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem id="admin-topbar-logout" onClick={() => void api.logout()} className="text-destructive">
-                <LogOut className="mr-2 size-4" />
-                Log out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Button
+            id="admin-topbar-mobile-search"
+            iconOnly
+            leadingIcon={RiSearchLine}
+            variant="ghost"
+            size="small"
+            className="md:hidden"
+            aria-label="Search admin"
+          />
+
+          <Dropdown>
+            <DropdownTrigger
+              id="admin-topbar-user-menu"
+              aria-label="Account menu"
+              className="flex items-center gap-2 rounded-full p-1 pr-2 transition-colors hover:bg-background-secondary-hover"
+            >
+              <Avatar size="md" initials={initialsFor(user.name, user.email)} color="blue" />
+              <span className="hidden min-w-0 text-left sm:block">
+                <span className="block truncate text-body-medium text-text-primary">
+                  {user.name || "Operator"}
+                </span>
+                <span className="block truncate text-caption-1-medium text-text-tertiary">
+                  {user.email}
+                </span>
+              </span>
+            </DropdownTrigger>
+            <DropdownPopover aria-label="Account" placement="bottom end" className="w-64">
+              <div className="flex flex-col gap-1 px-2 pb-2 pt-1">
+                <span className="flex items-center gap-2 text-body-medium text-text-primary">
+                  <RiShieldUserLine className="size-4 text-foreground-icon-secondary" aria-hidden />
+                  Platform admin
+                </span>
+                <span className="truncate ps-6 text-caption-1-regular text-text-tertiary">
+                  {user.email}
+                </span>
+              </div>
+              <DropdownDivider />
+              <DropdownItem
+                onSelect={() => {
+                  window.location.href = `${DASHBOARD_URL}/overview`;
+                }}
+              >
+                <RiExternalLinkLine className="size-5 shrink-0 text-foreground-icon-secondary" aria-hidden />
+                <span className="truncate text-body-medium text-text-primary">User dashboard</span>
+              </DropdownItem>
+              <DropdownDivider />
+              <DropdownItem
+                onSelect={() => void api.logout()}
+              >
+                <RiLogoutBoxRLine className="size-5 shrink-0 text-text-error-primary" aria-hidden />
+                <span className="truncate text-body-medium text-text-error-primary">Log out</span>
+              </DropdownItem>
+            </DropdownPopover>
+          </Dropdown>
         </div>
       </div>
 
-      <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-        <SheetContent side="left" className="w-[280px] gap-0 p-0">
-          <SheetHeader className="sr-only">
-            <SheetTitle>Admin navigation</SheetTitle>
-          </SheetHeader>
+      <Drawer
+        isOpen={mobileNavOpen}
+        onOpenChange={setMobileNavOpen}
+        placement="start"
+        size="sm"
+        aria-label="Admin navigation"
+        className="bg-background-full p-0 shadow-none"
+        overlayClassName="lg:hidden"
+      >
+        <div className="flex h-full flex-col p-2">
           <AdminSidebar variant="mobile" onNavigate={() => setMobileNavOpen(false)} />
-        </SheetContent>
-      </Sheet>
+        </div>
+      </Drawer>
     </header>
   );
 }

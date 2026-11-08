@@ -1,21 +1,21 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Inter } from "next/font/google";
 import Script from "next/script";
 import { CookieBanner } from "@/components/gdpr/cookie-banner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const geistSans = Geist({
+const inter = Inter({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-geist-sans",
+  variable: "--font-inter",
 });
 
-const geistMono = Geist_Mono({
+const monoSource = Geist_Mono({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-geist-mono",
+  variable: "--font-mono-source",
 });
 
 export const metadata: Metadata = {
@@ -31,13 +31,21 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`} suppressHydrationWarning>
+      <body className={`${inter.variable} ${monoSource.variable} font-sans antialiased`} suppressHydrationWarning>
         <Script
           id="strip-extension-hydration-attrs"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html:
               "document.querySelectorAll('[bis_skin_checked]').forEach(function (element) { element.removeAttribute('bis_skin_checked'); });",
+          }}
+        />
+        <Script
+          id="boardui-theme-prepaint"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{if(localStorage.getItem('boardui:theme')==='dark'){document.documentElement.classList.add('dark')}}catch(e){}",
           }}
         />
         <ErrorBoundary>

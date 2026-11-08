@@ -2,11 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { AuthPageGuard } from "@/components/auth/auth-page-guard";
-import { AuthSplitShell } from "@/components/auth/auth-split-shell";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { AuthCard } from "@/components/application/auth/auth-card";
 import { login } from "@/lib/auth";
 import { getPostAuthRedirect, isExternalRedirectTarget } from "@/lib/auth-redirect";
 import { toast } from "sonner";
@@ -16,15 +14,15 @@ import { toast } from "sonner";
 // no register/forgot-password routes of its own.
 export default function LoginPage() {
     const router = useRouter();
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const nextPath = typeof window !== "undefined"
         ? new URLSearchParams(window.location.search).get("next") || new URLSearchParams(window.location.search).get("redirect")
         : null;
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = async (data: FormData) => {
+        if (loading) return;
+        const email = String(data.get("email") ?? "");
+        const password = String(data.get("password") ?? "");
         setLoading(true);
 
         try {
@@ -44,43 +42,23 @@ export default function LoginPage() {
 
     return (
         <AuthPageGuard nextPath={nextPath}>
-        <AuthSplitShell>
-            <div className="mb-8">
-                <h1 className="text-2xl font-semibold text-foreground">Admin sign in</h1>
-                <p className="mt-1 text-sm text-muted-foreground">Sign in to the Opslin admin console</p>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                        id="email"
-                        type="email"
-                        placeholder="you@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                    />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                        id="password"
-                        type="password"
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                    />
-                </div>
-                <Button
-                    type="submit"
-                    className="w-full transition-transform duration-150 active:scale-[0.98]"
-                    disabled={loading}
-                >
-                    {loading ? "Signing in..." : "Sign in"}
-                </Button>
-            </form>
-        </AuthSplitShell>
+            <main className="flex min-h-screen items-center justify-center bg-background-full p-6">
+                <AuthCard
+                    mode="signin"
+                    providers={[]}
+                    hideAuxLinks
+                    title="Admin sign in"
+                    description="Sign in to the Opslin admin console."
+                    logo={
+                        <span className="flex items-center">
+                            <Image src="/logo/opslin-logo-black.png" alt="Opslin" width={129} height={40} className="theme-logo-light h-8 w-auto" />
+                            <Image src="/logo/opslin-logo-white.png" alt="" aria-hidden width={129} height={40} className="theme-logo-dark h-8 w-auto" />
+                        </span>
+                    }
+                    footnote="Accounts are provisioned by Opslin. Contact your administrator if you need access."
+                    onSubmit={(data) => void handleSubmit(data)}
+                />
+            </main>
         </AuthPageGuard>
     );
 }
